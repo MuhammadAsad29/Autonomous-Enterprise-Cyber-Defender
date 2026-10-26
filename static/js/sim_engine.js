@@ -103,7 +103,7 @@
             return {
                 network_state: {
                     nodes: this.nodes,
-                    edges: EDGES,
+                    edges: EDGES.map(([u, v]) => ({ from: u, to: v })),
                     step: this.currentStep,
                     max_steps: this.maxSteps,
                     active_infections: activeInfections,
@@ -326,6 +326,7 @@
                 num_episodes: 800,
                 final_win_rate_pct: 93.0,
                 recent_batch_win_rate_pct: 95.2,
+                final_epsilon: 0.05,
                 outcomes: {
                     DEFENDER_WON_TRAPPED: 344,
                     DEFENDER_WON_TIMEOUT: 400,
@@ -334,6 +335,7 @@
                 loss_history: [0.82, 0.45, 0.31, 0.22, 0.18, 0.14, 0.11, 0.09, 0.07, 0.05],
                 win_rates: [78.0, 84.5, 88.0, 91.0, 92.4, 93.8, 94.5, 95.0, 95.2],
                 episode_rewards: [12.0, 45.0, 95.0, 140.0, 210.0, 290.0, 360.0, 437.1],
+                moving_avg_rewards: [10.5, 38.0, 82.0, 125.0, 195.0, 275.0, 345.0, 420.0],
             };
         }
     }

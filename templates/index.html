@@ -10,10 +10,12 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Vis.js Network Graph for interactive topology -->
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <!-- Chart.js for real-time Q-values and training curves -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Vis.js Network Graph for interactive topology (CDNJS with fallback) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
+    <script>if (!window.vis) document.write('<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"><\\/script>');</script>
+    <!-- Chart.js for real-time Q-values and training curves (CDNJS with fallback) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script>if (!window.Chart) document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js"><\\/script>');</script>
     <!-- Custom Cyber SOC Stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/soc.css') }}">
 </head>

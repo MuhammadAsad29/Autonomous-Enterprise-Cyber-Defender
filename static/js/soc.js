@@ -25,11 +25,36 @@ const STATUS_COLORS = {
     "Isolated": { background: "#0891b2", border: "#00f2fe", highlight: { background: "#06b6d4", border: "#22d3ee" } },
 };
 
+function isStaticEnvironment() {
+    return window.isStaticMode ||
+           window.location.protocol === "file:" ||
+           window.location.hostname.includes("hf.space") ||
+           window.location.hostname.includes("huggingface.co") ||
+           window.location.hostname.includes("github.io");
+}
+
 function initApp() {
-    initTopologyGraph();
-    initQChart();
-    attachEventListeners();
-    fetchState();
+    console.log("[CyberBattle-RL] Initializing SOC Mission Control...");
+    try {
+        initTopologyGraph();
+    } catch (e) {
+        console.error("Topology graph init error:", e);
+    }
+    try {
+        initQChart();
+    } catch (e) {
+        console.error("QChart init error:", e);
+    }
+    try {
+        attachEventListeners();
+    } catch (e) {
+        console.error("Event listeners attach error:", e);
+    }
+    try {
+        fetchState();
+    } catch (e) {
+        console.error("Fetch state error:", e);
+    }
 }
 
 if (document.readyState === "loading") {
@@ -41,6 +66,15 @@ if (document.readyState === "loading") {
 // --- 1. Vis.js Network Topology Initialization ---
 function initTopologyGraph() {
     const container = document.getElementById("networkTopologyGraph");
+    if (!container) {
+        console.error("networkTopologyGraph element not found!");
+        return;
+    }
+
+    if (typeof vis === "undefined" || !vis.DataSet) {
+        console.warn("vis-network library not loaded yet, graph will render once loaded.");
+        return;
+    }
 
     nodesDataSet = new vis.DataSet([]);
     edgesDataSet = new vis.DataSet([]);
@@ -114,7 +148,12 @@ function initTopologyGraph() {
 
 // --- 2. Chart.js Neural Q-Values Chart ---
 function initQChart() {
-    const ctx = document.getElementById("qValuesChart").getContext("2d");
+    const canvas = document.getElementById("qValuesChart");
+    if (!canvas || typeof Chart === "undefined") {
+        console.warn("qValuesChart canvas or Chart library not ready.");
+        return;
+    }
+    const ctx = canvas.getContext("2d");
     qChart = new Chart(ctx, {
         type: "bar",
         data: {
@@ -184,7 +223,24 @@ function attachEventListeners() {
 }
 
 // --- 4. State & Network Sync ---
+function loadStaticState() {
+    window.isStaticMode = true;
+    if (window.SimEngine) {
+        const data = window.SimEngine.getState();
+        renderNetwork(data.network_state);
+        updateScoreboard(data.network_state);
+        renderQValues(data.top_actions);
+        populateManualNodeSelect(data.network_state.nodes);
+        appendLog("[SYSTEM READY] Autonomous Enterprise SOC online. Decoy grid active.", "blue", "SYS");
+    }
+}
+
 async function fetchState() {
+    if (isStaticEnvironment()) {
+        loadStaticState();
+        return;
+    }
+
     try {
         const res = await fetch("/api/state");
         if (!res.ok) throw new Error("API not available");
@@ -194,21 +250,14 @@ async function fetchState() {
         populateManualNodeSelect(data.nodes);
     } catch (err) {
         console.log("[Static Mode] Activating client-side simulation engine...");
-        window.isStaticMode = true;
-        if (window.SimEngine) {
-            const data = window.SimEngine.getState();
-            renderNetwork(data.network_state);
-            updateScoreboard(data.network_state);
-            renderQValues(data.top_actions);
-            populateManualNodeSelect(data.network_state.nodes);
-        }
+        loadStaticState();
     }
 }
 
 function renderNetwork(state) {
-    if (state && state.nodes) {
-        populateManualNodeSelect(state.nodes);
-    }
+    if (!state || !state.nodes) return;
+    populateManualNodeSelect(state.nodes);
+
     const visNodes = [];
     currentNodesData = {};
 
@@ -249,15 +298,20 @@ function renderNetwork(state) {
         });
     });
 
-    nodesDataSet.clear();
-    nodesDataSet.add(visNodes);
+    if (nodesDataSet) {
+        nodesDataSet.clear();
+        nodesDataSet.add(visNodes);
+    }
 
-    const visEdges = state.edges.map((e) => ({
-        from: e.from,
-        to: e.to,
-    }));
-    edgesDataSet.clear();
-    edgesDataSet.add(visEdges);
+    const visEdges = (state.edges || []).map((e) => {
+        if (Array.isArray(e)) return { from: e[0], to: e[1] };
+        return { from: e.from, to: e.to };
+    });
+
+    if (edgesDataSet) {
+        edgesDataSet.clear();
+        edgesDataSet.add(visEdges);
+    }
 }
 
 function updateScoreboard(state) {
@@ -319,93 +373,101 @@ function populateManualNodeSelect(nodes) {
 }
 
 // --- 5. Simulation Execution ---
-async function stepSimulation(manualActionId = null) {
-    try {
-        let data;
-        if (window.isStaticMode && window.SimEngine) {
-            data = window.SimEngine.step(manualActionId);
-        } else {
-            const payload = manualActionId !== null ? { action_id: manualActionId } : {};
-            const res = await fetch("/api/step", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
-            if (!res.ok) throw new Error("API not available");
-            data = await res.json();
-        }
+function processStepResult(data) {
+    if (!data) return;
+    const info = data.step_info || {};
 
-        const info = data.step_info;
+    // Update topology & scoreboard
+    if (data.network_state) {
+        data.network_state.cumulative_reward = data.cumulative_reward;
+        renderNetwork(data.network_state);
+        updateScoreboard(data.network_state);
+    }
 
-        // Update topology & scoreboard
-        if (data.network_state) {
-            data.network_state.cumulative_reward = data.cumulative_reward;
-            renderNetwork(data.network_state);
-            updateScoreboard(data.network_state);
-        }
-
-        // Update Q-values display
+    // Update Q-values display
+    if (data.top_actions) {
         renderQValues(data.top_actions);
+    }
 
-        // Append Telemetry Logs
-        if (info.defense_log) {
-            appendLog(info.defense_log, info.trapped_in_honeypot ? "trap" : "blue", "BLUE");
-        }
-        if (info.attacker_log && info.attacker_log !== info.defense_log) {
-            appendLog(info.attacker_log, "red", "RED");
-        }
+    // Append Telemetry Logs
+    if (info.defense_log) {
+        appendLog(info.defense_log, info.trapped_in_honeypot ? "trap" : "blue", "BLUE");
+    }
+    if (info.attacker_log && info.attacker_log !== info.defense_log) {
+        appendLog(info.attacker_log, "red", "RED");
+    }
 
-        // Check completion
-        if (data.done) {
-            if (autoRunInterval) toggleAutoRun();
-            let outcomeMsg = "";
-            let outcomeType = "system";
-            if (info.result === "DEFENDER_WON_TRAPPED") {
-                outcomeMsg = "[VICTORY] APT threat actor neutralized! Decoy honeypot successfully trapped attacker (+50 Reward)!";
-                outcomeType = "trap";
-            } else if (info.result === "ATTACKER_WON_BREACH") {
-                outcomeMsg = "[DEFEAT] Attacker breached Crown Jewel Database (-100 Penalty)!";
-                outcomeType = "red";
-            } else {
-                outcomeMsg = "[DEFENSE SUCCESS] Time horizon reached. Enterprise network held secure against lateral movement!";
-                outcomeType = "blue";
-            }
-            appendLog(outcomeMsg, outcomeType, "SYS");
+    // Check completion
+    if (data.done) {
+        if (autoRunInterval) toggleAutoRun();
+        let outcomeMsg = "";
+        let outcomeType = "system";
+        if (info.result === "DEFENDER_WON_TRAPPED") {
+            outcomeMsg = "[VICTORY] APT threat actor neutralized! Decoy honeypot successfully trapped attacker (+50 Reward)!";
+            outcomeType = "trap";
+        } else if (info.result === "ATTACKER_WON_BREACH") {
+            outcomeMsg = "[DEFEAT] Attacker breached Crown Jewel Database (-100 Penalty)!";
+            outcomeType = "red";
+        } else {
+            outcomeMsg = "[DEFENSE SUCCESS] Time horizon reached. Enterprise network held secure against lateral movement!";
+            outcomeType = "blue";
         }
+        appendLog(outcomeMsg, outcomeType, "SYS");
+    }
+}
+
+async function stepSimulation(manualActionId = null) {
+    if (isStaticEnvironment() && window.SimEngine) {
+        window.isStaticMode = true;
+        const data = window.SimEngine.step(manualActionId);
+        processStepResult(data);
+        return;
+    }
+
+    try {
+        const payload = manualActionId !== null ? { action_id: manualActionId } : {};
+        const res = await fetch("/api/step", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("API not available");
+        const data = await res.json();
+        processStepResult(data);
     } catch (err) {
         console.error("Step execution failed, switching to static mode:", err);
         window.isStaticMode = true;
         if (window.SimEngine) {
             const data = window.SimEngine.step(manualActionId);
-            if (data.network_state) {
-                renderNetwork(data.network_state);
-                updateScoreboard(data.network_state);
-            }
-            renderQValues(data.top_actions);
+            processStepResult(data);
         }
     }
 }
 
 async function resetSimulation() {
     if (autoRunInterval) toggleAutoRun();
-    try {
-        let data;
-        if (window.isStaticMode && window.SimEngine) {
-            data = window.SimEngine.reset();
-            renderNetwork(data.network_state);
-            updateScoreboard(data.network_state);
-            renderQValues(data.top_actions);
-            appendLog("[SYSTEM] Network topology reset to perimeter baseline.", "system", "SYS");
-            return;
-        }
 
+    if (isStaticEnvironment() && window.SimEngine) {
+        window.isStaticMode = true;
+        const data = window.SimEngine.reset();
+        renderNetwork(data.network_state);
+        updateScoreboard(data.network_state);
+        renderQValues(data.top_actions);
+        appendLog("[SYSTEM] Network topology reset to perimeter baseline.", "system", "SYS");
+        const qContainer = document.getElementById("topQActionsList");
+        if (qContainer) qContainer.innerHTML = `<div class="placeholder-q">Network reset to perimeter baseline.</div>`;
+        return;
+    }
+
+    try {
         const res = await fetch("/api/reset", { method: "POST" });
         if (!res.ok) throw new Error("API not available");
-        data = await res.json();
+        const data = await res.json();
         renderNetwork(data);
         updateScoreboard(data);
         appendLog(data.message, "system", "SYS");
-        document.getElementById("topQActionsList").innerHTML = `<div class="placeholder-q">Network reset to perimeter baseline.</div>`;
+        const qContainer = document.getElementById("topQActionsList");
+        if (qContainer) qContainer.innerHTML = `<div class="placeholder-q">Network reset to perimeter baseline.</div>`;
     } catch (err) {
         console.error("Reset failed, switching to static mode:", err);
         window.isStaticMode = true;
@@ -415,12 +477,14 @@ async function resetSimulation() {
             updateScoreboard(data.network_state);
             renderQValues(data.top_actions);
             appendLog("[SYSTEM] Network topology reset to perimeter baseline.", "system", "SYS");
+            const qContainer = document.getElementById("topQActionsList");
+            if (qContainer) qContainer.innerHTML = `<div class="placeholder-q">Network reset to perimeter baseline.</div>`;
         }
     }
 }
 
 async function updateConfig(config) {
-    if (window.isStaticMode && window.SimEngine) {
+    if (isStaticEnvironment() && window.SimEngine) {
         if (config.threat_level) window.SimEngine.setThreatLevel(config.threat_level);
         if (config.defense_mode) window.SimEngine.setDefenseMode(config.defense_mode);
         appendLog(`Configuration updated: ${JSON.stringify(config)}`, "system", "CFG");
@@ -432,12 +496,6 @@ async function updateConfig(config) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(config),
         });
-        const data = await res.json();
-        appendLog(`Configuration updated: Threat Actor = [${data.threat_level}], Defense Strategy = [${data.defense_mode}]`, "system", "CFG");
-    } catch (err) {
-        console.error("Config update failed:", err);
-    }
-}
         const data = await res.json();
         appendLog(`Configuration updated: Threat Actor = [${data.threat_level}], Defense Strategy = [${data.defense_mode}]`, "system", "CFG");
     } catch (err) {
@@ -537,7 +595,7 @@ async function openAnalyticsModal() {
     const modal = document.getElementById("analyticsModal");
     modal.classList.add("active");
 
-    if (window.isStaticMode && window.SimEngine) {
+    if (isStaticEnvironment() && window.SimEngine) {
         renderAnalyticsCharts(window.SimEngine.getMetrics());
         return;
     }
@@ -671,7 +729,7 @@ async function triggerRetrain() {
     msgEl.innerText = `Running ${episodes} training episodes...`;
     msgEl.style.color = "var(--accent-amber)";
 
-    if (window.isStaticMode && window.SimEngine) {
+    if (isStaticEnvironment() && window.SimEngine) {
         setTimeout(() => {
             const metrics = window.SimEngine.getMetrics();
             msgEl.innerText = `Completed ${episodes} episodes! Batch Win Rate: 95.2% | Overall: 93.8% | Avg Reward: +380.5`;
