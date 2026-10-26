@@ -15,15 +15,23 @@ from cyberbattle_env.env import CyberDefenderEnv
 from cyberbattle_env.attacker import ThreatLevel
 from rl_agent.double_dqn import DoubleDQNAgent
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static"),
+)
 
 # Global instances for the interactive session
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "double_dqn_defender.pth")
-METRICS_PATH = os.path.join(os.path.dirname(__file__), "models", "training_metrics.json")
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+MODEL_PATH = os.path.join(BASE_DIR, "models", "double_dqn_defender.pth")
+METRICS_PATH = os.path.join(BASE_DIR, "models", "training_metrics.json")
+DATA_DIR = os.path.join(BASE_DIR, "data")
 EXPERIENCE_LOG_PATH = os.path.join(DATA_DIR, "fine_tuning_experience.jsonl")
-REPLAY_BUFFER_PATH = os.path.join(os.path.dirname(__file__), "models", "replay_buffer.pth")
-os.makedirs(DATA_DIR, exist_ok=True)
+REPLAY_BUFFER_PATH = os.path.join(BASE_DIR, "models", "replay_buffer.pth")
+try:
+    os.makedirs(DATA_DIR, exist_ok=True)
+except Exception:
+    pass
 
 # Initialize Environment & Double DQN Agent
 env = CyberDefenderEnv(threat_level=ThreatLevel.AGGRESSIVE_APT, max_steps=50)
@@ -197,7 +205,13 @@ def run_training_api():
         batch_timeouts = 0
 
         # Open experience log file to persist fine-tuning dataset
-        with open(EXPERIENCE_LOG_PATH, "a", encoding="utf-8") as exp_log:
+        exp_log = None
+        try:
+            exp_log = open(EXPERIENCE_LOG_PATH, "a", encoding="utf-8")
+        except Exception:
+            pass
+
+        try:
             for ep_idx in range(episodes):
                 s = env.reset()
                 ep_r = 0.0
@@ -208,24 +222,28 @@ def run_training_api():
                     agent.step(s, a, r, s_next, d)
 
                     # Persist experience transition record to dataset
-                    transition_record = {
-                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "fine_tune_episode": ep_idx + 1,
-                        "step": step_idx + 1,
-                        "action_id": int(a),
-                        "action_name": env.ACTION_NAMES[a // 10],
-                        "target_node": env.topology.nodes[a % 10].name,
-                        "target_node_id": a % 10,
-                        "reward": float(r),
-                        "defense_log": info.get("defense_log", ""),
-                        "attacker_log": info.get("attacker_log", ""),
-                        "attacker_action": info.get("attacker_action", ""),
-                        "active_infections": info.get("active_infections", 0),
-                        "isolated_hosts": info.get("isolated_hosts", 0),
-                        "done": bool(d),
-                        "result": info.get("result", "ONGOING"),
-                    }
-                    exp_log.write(json.dumps(transition_record) + "\n")
+                    if exp_log:
+                        try:
+                            transition_record = {
+                                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                "fine_tune_episode": ep_idx + 1,
+                                "step": step_idx + 1,
+                                "action_id": int(a),
+                                "action_name": env.ACTION_NAMES[a // 10],
+                                "target_node": env.topology.nodes[a % 10].name,
+                                "target_node_id": a % 10,
+                                "reward": float(r),
+                                "defense_log": info.get("defense_log", ""),
+                                "attacker_log": info.get("attacker_log", ""),
+                                "attacker_action": info.get("attacker_action", ""),
+                                "active_infections": info.get("active_infections", 0),
+                                "isolated_hosts": info.get("isolated_hosts", 0),
+                                "done": bool(d),
+                                "result": info.get("result", "ONGOING"),
+                            }
+                            exp_log.write(json.dumps(transition_record) + "\n")
+                        except Exception:
+                            pass
 
                     s = s_next
                     ep_r += r
@@ -241,13 +259,22 @@ def run_training_api():
                     batch_breached += 1
                 else:
                     batch_timeouts += 1
+        finally:
+            if exp_log:
+                try:
+                    exp_log.close()
+                except Exception:
+                    pass
 
         batch_wins = batch_trapped + batch_timeouts
         batch_win_rate = round(float(batch_wins / episodes) * 100.0, 1)
 
         # Save model neural network weights and replay memory buffer
-        agent.save_checkpoint(MODEL_PATH)
-        agent.replay_buffer.save_to_disk(REPLAY_BUFFER_PATH)
+        try:
+            agent.save_checkpoint(MODEL_PATH)
+            agent.replay_buffer.save_to_disk(REPLAY_BUFFER_PATH)
+        except Exception:
+            pass
 
         # Update training_metrics.json
         total_episodes = episodes
