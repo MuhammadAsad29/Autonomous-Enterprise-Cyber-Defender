@@ -170,7 +170,7 @@
                     action_name: ACTION_NAMES[actionType],
                     target_node: node.name,
                     q_value: qVal,
-                    action_type: actionType,
+                    action_type: ACTION_NAMES[actionType],
                 });
             }
 

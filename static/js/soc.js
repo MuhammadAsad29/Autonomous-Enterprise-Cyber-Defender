@@ -25,12 +25,18 @@ const STATUS_COLORS = {
     "Isolated": { background: "#0891b2", border: "#00f2fe", highlight: { background: "#06b6d4", border: "#22d3ee" } },
 };
 
-document.addEventListener("DOMContentLoaded", () => {
+function initApp() {
     initTopologyGraph();
     initQChart();
     attachEventListeners();
     fetchState();
-});
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initApp);
+} else {
+    initApp();
+}
 
 // --- 1. Vis.js Network Topology Initialization ---
 function initTopologyGraph() {
@@ -469,14 +475,15 @@ function renderQValues(topActions) {
     const values = [];
 
     topActions.forEach((act, idx) => {
-        labels.push(`${act.action_type.split(" ")[0]} -> ${act.target_node.substring(0, 10)}`);
+        const actionStr = String(act.action_type || act.action_name || "Action");
+        labels.push(`${actionStr.split(" ")[0]} -> ${String(act.target_node).substring(0, 10)}`);
         values.push(act.q_value);
 
         const item = document.createElement("div");
         item.className = `q-item ${idx === 0 ? "best" : ""}`;
         item.innerHTML = `
-            <span><strong>${act.action_type}</strong> &rarr; ${act.target_node}</span>
-            <span class="q-badge">Q = ${act.q_value.toFixed(2)}</span>
+            <span><strong>${actionStr}</strong> &rarr; ${act.target_node}</span>
+            <span class="q-badge">Q = ${Number(act.q_value).toFixed(2)}</span>
         `;
         container.appendChild(item);
     });
