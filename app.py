@@ -3,9 +3,19 @@ import json
 import numpy as np
 import torch
 import os
+import sys
+
+# LOCAL PATH FIX: ensure rl_agent is importable even on Cloud
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Safe import with fallback
+try:
+    from rl_agent.train import train_agent
+    TRAIN_AVAILABLE = True
+except ImportError:
+    TRAIN_AVAILABLE = False
 
 from rl_agent.double_dqn import DoubleDQNAgent
-from rl_agent.train import train_agent
 from cyberbattle_env.env import CyberDefenderEnv
 from cyberbattle_env.attacker import ThreatLevel
 
@@ -104,18 +114,22 @@ if st.sidebar.button("🚀 Auto Run 10 Steps"):
             break
     st.rerun()
 
-# Training section
+# Training section (only if import successful)
 st.sidebar.markdown("---")
 st.sidebar.header("🧠 Training")
-if st.sidebar.button("📚 Train Agent (25 ep)"):
-    with st.spinner("Training in progress..."):
-        rewards = train_agent(episodes=25, env=env)
-    st.sidebar.success(f"Training complete! Avg reward: {np.mean(rewards[-5:]):.1f}")
+if TRAIN_AVAILABLE:
+    if st.sidebar.button("📚 Train Agent (25 ep)"):
+        with st.spinner("Training in progress..."):
+            rewards = train_agent(episodes=25, env=env)
+        st.sidebar.success(f"Training complete! Avg reward: {np.mean(rewards[-5:]):.1f}")
+else:
+    st.sidebar.info("Training module not available. Check rl_agent folder.")
+    st.sidebar.caption("To enable training, ensure rl_agent/train.py exists with train_agent function.")
 
 # Footer
 st.markdown("---")
 st.caption("""📝 **Note**: Model weights `models/double_dqn_defender.pth` required for inference.
-🔧 **Train** button uses fine-tuning pipeline. GitHub deploy recommended for full access.""")
+🔧 **Double DQN Agent** working normally. Training feature depends on module availability.""")
 
 # Required at bottom
 if __name__ == "__main__":
