@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberBattle-RL | Autonomous Enterprise Cyber Defense</title>
+    <!-- Modern Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Vis.js Network Graph for interactive topology -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <!-- Chart.js for real-time Q-values and training curves -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Cyber SOC Stylesheet -->
+    <link rel="stylesheet" href="static/css/soc.css">
+</head>
+<body class="soc-body">
+    <!-- Background Grid Pattern -->
+    <div class="cyber-grid-overlay"></div>
+
+    <!-- Header / Mission Control Bar -->
+    <header class="soc-header">
+        <div class="header-branding">
+            <div class="logo-badge">
+                <i class="fa-solid fa-shield-halved glow-shield"></i>
+            </div>
+            <div class="header-title">
+                <h1>CYBERBATTLE-RL <span class="edition-tag">ENTERPRISE BLUE TEAM</span></h1>
+                <p class="subtitle">Autonomous Cyber Defense System &bull; Double DQN with Experience Replay &bull; Microsoft CyberBattleSim Topology</p>
+            </div>
+        </div>
+
+        <!-- Real-time Status Badges -->
+        <div class="header-telemetry">
+            <div class="tele-item" id="crownJewelStatus">
+                <span class="tele-label">CROWN JEWEL DB</span>
+                <span class="tele-val safe" id="dbStatusBadge"><i class="fa-solid fa-database"></i> SECURE</span>
+            </div>
+            <div class="tele-item">
+                <span class="tele-label">NET REWARD</span>
+                <span class="tele-val highlight" id="cumulativeRewardVal">+0.0</span>
+            </div>
+            <div class="tele-item">
+                <span class="tele-label">SIMULATION STEP</span>
+                <span class="tele-val" id="stepCounterVal">0 / 50</span>
+            </div>
+            <button class="soc-btn-outline" id="openAnalyticsBtn" title="View Double DQN Model Training Metrics">
+                <i class="fa-solid fa-chart-line"></i> RL Analytics
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Mission Control Grid -->
+    <main class="soc-container">
+        <!-- Left Panel: Controls, Threat Config, & Real-Time Q-Values -->
+        <aside class="soc-sidebar-left">
+            <!-- Simulation Controller Card -->
+            <div class="soc-card control-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-gamepad"></i> MISSION CONTROLS</h3>
+                    <span class="status-indicator live" id="liveIndicator">STANDBY</span>
+                </div>
+                <div class="control-actions">
+                    <button class="soc-btn primary" id="stepBtn" title="Advance simulation by 1 turn">
+                        <i class="fa-solid fa-forward-step"></i> Step Turn
+                    </button>
+                    <button class="soc-btn success" id="autoBtn" title="Run continuous defense simulation">
+                        <i class="fa-solid fa-play"></i> Auto Run
+                    </button>
+                    <button class="soc-btn danger" id="resetBtn" title="Reset network topology">
+                        <i class="fa-solid fa-rotate-left"></i> Reset
+                    </button>
+                </div>
+
+                <!-- Simulation Speed -->
+                <div class="setting-group">
+                    <label for="speedSelect"><i class="fa-solid fa-gauge-high"></i> Execution Speed:</label>
+                    <select id="speedSelect" class="soc-select">
+                        <option value="1200">1.0x (Normal)</option>
+                        <option value="600" selected>2.0x (Tactical)</option>
+                        <option value="250">5.0x (High Speed)</option>
+                    </select>
+                </div>
+
+                <!-- Threat Actor Profile -->
+                <div class="setting-group">
+                    <label for="threatSelect"><i class="fa-solid fa-skull-crossbones"></i> Red Team Threat Actor:</label>
+                    <select id="threatSelect" class="soc-select">
+                        <option value="Aggressive APT" selected>Aggressive APT (Lateral Pivot)</option>
+                        <option value="Stealthy Ransomware">Stealthy Ransomware (Creeping)</option>
+                        <option value="Script Kiddie">Script Kiddie (Noisy Scanning)</option>
+                    </select>
+                </div>
+
+                <!-- Blue Team Defense Strategy -->
+                <div class="setting-group">
+                    <label for="defenseModeSelect"><i class="fa-solid fa-brain"></i> Blue Team Strategy:</label>
+                    <select id="defenseModeSelect" class="soc-select">
+                        <option value="Double DQN" selected>Double DQN Agent (Learned Policy)</option>
+                        <option value="Heuristic">Rule-Based Heuristic Baseline</option>
+                        <option value="Random">Random Defense (Stochastic)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Neural Double DQN Q-Value Inspector -->
+            <div class="soc-card q-value-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-microchip"></i> DOUBLE DQN ACTION VALUES</h3>
+                    <span class="agent-tag">Dense(64&rarr;256&rarr;128&rarr;40)</span>
+                </div>
+                <p class="section-desc">Evaluated action-value $Q(s, a)$ for candidate defensive maneuvers:</p>
+                <div class="q-actions-container" id="topQActionsList">
+                    <div class="placeholder-q">Step the simulation to evaluate neural action values...</div>
+                </div>
+                <!-- Mini Q-Value Chart -->
+                <div class="chart-box">
+                    <canvas id="qValuesChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Manual Defense Override Tool -->
+            <div class="soc-card manual-action-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-terminal"></i> MANUAL OPERATOR OVERRIDE</h3>
+                </div>
+                <div class="manual-inputs">
+                    <select id="manualActionType" class="soc-select">
+                        <option value="0">0: Isolate Host</option>
+                        <option value="1">1: Re-image Server</option>
+                        <option value="2">2: Deploy Decoy Honeypot</option>
+                        <option value="3">3: Revoke Auth Token</option>
+                    </select>
+                    <select id="manualTargetNode" class="soc-select">
+                        <!-- Populated dynamically via JS -->
+                    </select>
+                    <button class="soc-btn secondary" id="executeManualActionBtn">
+                        <i class="fa-solid fa-bolt"></i> Execute Action
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Panel: Live Enterprise Topology Graph -->
+        <section class="soc-topology-panel">
+            <div class="soc-card graph-card">
+                <div class="card-header">
+                    <div class="graph-title-group">
+                        <h3><i class="fa-solid fa-network-wired"></i> ENTERPRISE NETWORK TOPOLOGY</h3>
+                        <span class="sub-info">Microsoft CyberBattleSim Multi-Subnet Architecture</span>
+                    </div>
+                    <!-- Legend Badges -->
+                    <div class="graph-legend">
+                        <span class="legend-item"><span class="dot clean"></span> Clean</span>
+                        <span class="legend-item"><span class="dot scanned"></span> Scanned</span>
+                        <span class="legend-item"><span class="dot compromised"></span> Compromised</span>
+                        <span class="legend-item"><span class="dot decoy"></span> Honeypot Decoy</span>
+                        <span class="legend-item"><span class="dot isolated"></span> Isolated</span>
+                        <span class="legend-item"><span class="dot crown"></span> Crown Jewel DB</span>
+                    </div>
+                </div>
+
+                <!-- Vis.js Graph Canvas Container -->
+                <div id="networkTopologyGraph" class="topology-canvas"></div>
+
+                <!-- Selected Node Quick Inspector Bar -->
+                <div class="node-inspector-bar" id="nodeInspectorBar">
+                    <div class="inspect-item">
+                        <span class="inspect-label">Selected Node:</span>
+                        <span class="inspect-val" id="inspectNodeName">Click any host to inspect</span>
+                    </div>
+                    <div class="inspect-item">
+                        <span class="inspect-label">Subnet:</span>
+                        <span class="inspect-val" id="inspectNodeSubnet">-</span>
+                    </div>
+                    <div class="inspect-item">
+                        <span class="inspect-label">Vulnerability:</span>
+                        <span class="inspect-val alert" id="inspectNodeVuln">-</span>
+                    </div>
+                    <div class="inspect-item">
+                        <span class="inspect-label">Alert Level:</span>
+                        <span class="inspect-val" id="inspectNodeAlert">-</span>
+                    </div>
+                    <div class="inspect-item">
+                        <span class="inspect-label">Status:</span>
+                        <span class="inspect-val" id="inspectNodeStatus">-</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Telemetry Event Feed & Operational Metrics -->
+        <aside class="soc-sidebar-right">
+            <!-- Operational Scoreboard -->
+            <div class="soc-card metrics-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-shield-virus"></i> THREAT SCOREBOARD</h3>
+                </div>
+                <div class="score-grid">
+                    <div class="score-box">
+                        <span class="score-num safe" id="scoreInfections">0</span>
+                        <span class="score-lbl">Active Infections</span>
+                    </div>
+                    <div class="score-box">
+                        <span class="score-num warning" id="scoreIsolated">0</span>
+                        <span class="score-lbl">Isolated Hosts</span>
+                    </div>
+                    <div class="score-box">
+                        <span class="score-num purple" id="scoreStolenTokens">0</span>
+                        <span class="score-lbl">Stolen Credentials</span>
+                    </div>
+                    <div class="score-box">
+                        <span class="score-num" id="scoreDowntimeCost">0 pts</span>
+                        <span class="score-lbl">Downtime Penalty</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MITRE ATT&CK & Defense Telemetry Feed -->
+            <div class="soc-card feed-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-list-check"></i> SECURITY TELEMETRY FEED</h3>
+                    <button class="clear-feed-btn" id="clearLogBtn" title="Clear Event Logs"><i class="fa-solid fa-eraser"></i></button>
+                </div>
+                <div class="telemetry-feed-container" id="telemetryFeed">
+                    <div class="log-entry system">
+                        <span class="log-time">[00:00]</span>
+                        <span class="log-tag tag-sys">SYS</span>
+                        <span class="log-text">Cyber SOC defense grid initialized. Double DQN ready.</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- RL Training Analytics Modal -->
+    <div class="soc-modal" id="analyticsModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-chart-line"></i> Double DQN Defender &bull; ML Performance Analytics</h2>
+                <button class="close-modal-btn" id="closeAnalyticsModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="metrics-summary-strip">
+                    <div class="summary-pill">
+                        <span class="pill-title">Trained Episodes</span>
+                        <span class="pill-value" id="mSummaryEpisodes">800</span>
+                    </div>
+                    <div class="summary-pill">
+                        <span class="pill-title">Crown Jewel Win Rate</span>
+                        <span class="pill-value success" id="mSummaryWinRate">93.0%</span>
+                    </div>
+                    <div class="summary-pill">
+                        <span class="pill-title">Attacker Trapped in Decoy</span>
+                        <span class="pill-value purple" id="mSummaryTrapped">344</span>
+                    </div>
+                    <div class="summary-pill">
+                        <span class="pill-title">Final Epsilon &epsilon;</span>
+                        <span class="pill-value" id="mSummaryEpsilon">0.05</span>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="modal-chart-box">
+                        <h4>Episode Rewards & Moving Average (window=25)</h4>
+                        <canvas id="modalRewardChart"></canvas>
+                    </div>
+                    <div class="modal-chart-box">
+                        <h4>Defender Win Rate Progression (%)</h4>
+                        <canvas id="modalWinRateChart"></canvas>
+                    </div>
+                    <div class="modal-chart-box full-width">
+                        <h4>Double DQN Huber Loss Convergence Curve</h4>
+                        <canvas id="modalLossChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- In-App Retrain Controller -->
+                <div class="retrain-section">
+                    <h4><i class="fa-solid fa-bolt"></i> On-Demand In-App Model Fine-Tuning</h4>
+                    <p>Execute incremental training episodes to adapt the Double DQN agent to dynamic threat patterns:</p>
+                    <div class="retrain-bar">
+                        <select id="retrainEpisodesSelect" class="soc-select inline">
+                            <option value="10">10 Episodes (Fast Quick-Tune)</option>
+                            <option value="25" selected>25 Episodes (Standard)</option>
+                            <option value="50">50 Episodes (Deep Refinement)</option>
+                        </select>
+                        <button class="soc-btn success" id="triggerRetrainBtn">
+                            <i class="fa-solid fa-play"></i> Start Fine-Tuning Pass
+                        </button>
+                        <span class="train-status-msg" id="trainStatusMsg"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Scripts for Static Hosting & Browser Simulation Engine -->
+    <script src="static/js/sim_engine.js"></script>
+    <script src="static/js/soc.js"></script>
+</body>
+</html>
