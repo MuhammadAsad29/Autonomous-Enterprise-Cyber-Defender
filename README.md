@@ -1,31 +1,5 @@
 <div align="center">
 
-```text
-  ██████╗██╗   ██╗██████╗ ███████╗██████╗ ██████╗  █████╗ ████████╗████████╗██╗     ███████╗
- ██╔════╝╚██╗ ██╔╝██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝╚══██╔══╝██║     ██╔════╝
- ██║      ╚████╔╝ ██████╔╝█████╗  ██████╔╝██████╔╝███████║   ██║      ██║   ██║     █████╗  
- ██║       ╚██╔╝  ██╔══██╗██╔══╝  ██╔══██╗██╔══██╗██╔══██║   ██║      ██║   ██║     ██╔══╝  
- ╚██████╗   ██║   ██████╔╝███████╗██████╔╝██████╔╝██║  ██║   ██║      ██║   ███████╗███████╗
-  ╚═════╝   ╚═╝   ╚═════╝ ╚══════╝╚═════╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝      ╚═╝   ╚══════╝╚══════╝
-```
-
-### **AUTONOMOUS ENTERPRISE CYBER DEFENSE PLATFORM**
-*Deep Reinforcement Learning Blue Team Agent modeled after Microsoft CyberBattleSim*
-
----
-
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![PyTorch 2.8](https://img.shields.io/badge/PyTorch-2.8-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![Algorithm](https://img.shields.io/badge/RL_Algorithm-Double_DQN-00f2fe?style=for-the-badge&logo=openai&logoColor=white)](#-deep-reinforcement-learning-formulation)
-[![Simulation](https://img.shields.io/badge/Simulation-Microsoft_CyberBattleSim-00a4ef?style=for-the-badge&logo=microsoft&logoColor=white)](https://github.com/microsoft/CyberBattleSim)
-[![Defense Win Rate](https://img.shields.io/badge/Defense_Win_Rate-95.2%25-10b981?style=for-the-badge&logo=shield&logoColor=white)](#-model-training-and-evaluation-benchmarks)
-[![Deployment](https://img.shields.io/badge/Cloud_Deployment-100%25_Free_(No_Card)-8b5cf6?style=for-the-badge&logo=render&logoColor=white)](#-live-cloud-deployment-guide-100-free-no-card)
-[![License](https://img.shields.io/badge/License-Apache_2.0-yellow?style=for-the-badge)](LICENSE)
-
-[Live SOC Overview](#-live-soc-mission-control-web-dashboard) • [Architecture](#-system-architecture) • [Math & RL](#-deep-reinforcement-learning-formulation) • [Quick Start](#-quick-start-local-execution) • [Deploy Live](#-live-cloud-deployment-guide-100-free-no-card)
-
-</div>
-
 ---
 
 ## 🛡️ Executive Summary
@@ -33,6 +7,7 @@
 In enterprise infrastructure, **Advanced Persistent Threat (APT)** actors execute coordinated multi-stage campaigns: breaching perimeter defenses through web exploits, stealing privileged credentials, moving laterally across subnets, and exfiltrating the **Crown Jewel Database**. Traditional Security Operations Center (SOC) manual triage takes hours—giving adversaries ample dwell time.
 
 **CyberBattle-RL** deploys an **Autonomous Blue Team AI Agent** powered by **Double Deep Q-Networks (Double DQN) with Experience Replay**. Modeled after **Microsoft CyberBattleSim**, the agent continuously senses a 64-dimensional host status matrix, calculates real-time neural action-values ($Q$), and dispatches defensive countermeasures:
+
 * **Decoy Honeypots**: Deploys deceptive canaries that trap hackers ($+50\text{ Reward}$).
 * **Host Isolation**: Quarantines compromised machines to sever lateral movement chains.
 * **Server Re-imaging**: Purges malware and restores healthy operations ($+10\text{ Reward}$).
@@ -95,27 +70,31 @@ graph TD
 ## 🧠 Deep Reinforcement Learning Formulation
 
 ### 1. 64-Dimensional Host Status Observation Matrix
+
 At each simulation step, the environment compiles an exact 64-dimensional state vector $\mathbf{s} \in \mathbb{R}^{64}$:
 
-| Index Range | Feature Representation | Value Domain | Cybersecurity Description |
-|:---:|:---|:---:|:---|
-| **$0 \to 9$** | Node Infection Flag | $0.0 \to 1.0$ | $0.0 = \text{Clean}$, $0.4 = \text{Scanned}$, $0.8 = \text{Compromised}$, $1.0 = \text{Owned (Admin)}$ |
-| **$10 \to 19$** | Stolen Token Exposure Ratio | $[0.0, 1.0]$ | Ratio of compromised authentication credentials vs total stored |
-| **$20 \to 29$** | Port & Telemetry Alert Level | $[0.0, 1.0]$ | Heuristic IDS anomaly score based on suspicious socket traffic |
-| **$30 \to 39$** | Quarantine Isolation Flag | $\{0.0, 1.0\}$ | $1.0$ if network interface is administratively severed |
-| **$40 \to 49$** | Decoy Honeypot Active Status | $\{0.0, 1.0\}$ | $1.0$ if host is configured as an active deceptive trap |
-| **$50 \to 59$** | Cumulative Attack Frequency | $[0.0, 1.0]$ | Normalized count of adversarial probes targeting this host |
-| **$60$** | Network-Wide Infection Ratio | $[0.0, 1.0]$ | Percentage of infrastructure currently breached |
-| **$61$** | Global Honeypot Trigger State | $\{0.0, 1.0\}$ | Asserted $1.0$ if adversary stepped into a decoy canary |
-| **$62$** | Crown Jewel Threat Proximity | $[0.0, 1.0]$ | Max alert level among immediate neighbors of Database (Node 8) |
-| **$63$** | Adversary Kill-Chain Progress | $0.05 \to 1.0$ | Stage tracking: Recon $\to$ Foothold $\to$ Pivot $\to$ Exfiltration |
+|       Index Range       | Feature Representation        |   Value Domain   | Cybersecurity Description                                                                                      |
+| :---------------------: | :---------------------------- | :--------------: | :------------------------------------------------------------------------------------------------------------- |
+|  **$0 \to 9$**  | Node Infection Flag           | $0.0 \to 1.0$ | $0.0 = \text{Clean}$, $0.4 = \text{Scanned}$, $0.8 = \text{Compromised}$, $1.0 = \text{Owned (Admin)}$ |
+| **$10 \to 19$** | Stolen Token Exposure Ratio   |  $[0.0, 1.0]$  | Ratio of compromised authentication credentials vs total stored                                                |
+| **$20 \to 29$** | Port & Telemetry Alert Level  |  $[0.0, 1.0]$  | Heuristic IDS anomaly score based on suspicious socket traffic                                                 |
+| **$30 \to 39$** | Quarantine Isolation Flag     | $\{0.0, 1.0\}$ | $1.0$ if network interface is administratively severed                                                       |
+| **$40 \to 49$** | Decoy Honeypot Active Status  | $\{0.0, 1.0\}$ | $1.0$ if host is configured as an active deceptive trap                                                      |
+| **$50 \to 59$** | Cumulative Attack Frequency   |  $[0.0, 1.0]$  | Normalized count of adversarial probes targeting this host                                                     |
+|    **$60$**    | Network-Wide Infection Ratio  |  $[0.0, 1.0]$  | Percentage of infrastructure currently breached                                                                |
+|    **$61$**    | Global Honeypot Trigger State | $\{0.0, 1.0\}$ | Asserted $1.0$ if adversary stepped into a decoy canary                                                      |
+|    **$62$**    | Crown Jewel Threat Proximity  |  $[0.0, 1.0]$  | Max alert level among immediate neighbors of Database (Node 8)                                                 |
+|    **$63$**    | Adversary Kill-Chain Progress | $0.05 \to 1.0$ | Stage tracking: Recon $\to$ Foothold $\to$ Pivot $\to$ Exfiltration                                      |
 
 ---
 
 ### 2. 40-Dimensional Discrete Action Space
+
 Defensive actions are parameterized across the 10 infrastructure nodes ($\text{Action ID} = \text{Action Type} \times 10 + \text{Target Node ID}$):
 
-$$\mathcal{A} = \{ \text{Action Type} \in \{0, 1, 2, 3\} \times \text{Host ID} \in \{0, \dots, 9\} \}$$
+$$
+\mathcal{A} = \{ \text{Action Type} \in \{0, 1, 2, 3\} \times \text{Host ID} \in \{0, \dots, 9\} \}
+$$
 
 * **`Action 0..9` (Isolate Host)**: Quarantines node from routing tables. Severing infected hosts yields $+15\text{ pts}$.
 * **`Action 10..19` (Re-image Server)**: Restores golden image, clears backdoors, and restores clean state ($+10\text{ pts}$).
@@ -125,20 +104,30 @@ $$\mathcal{A} = \{ \text{Action Type} \in \{0, 1, 2, 3\} \times \text{Host ID} \
 ---
 
 ### 3. Reward & Penalty Optimization Function
+
 The Blue Team agent optimizes cumulative expected return $R_t = \sum_{k=0}^{\infty} \gamma^k r_{t+k+1}$:
 
-$$r_t = \underbrace{+50.0 \cdot \mathbb{I}_{\text{Trapped}}}_{\text{Adversary Caught in Decoy}} - \underbrace{100.0 \cdot \mathbb{I}_{\text{Exfiltrated}}}_{\text{Database Breached}} - \underbrace{2.0 \cdot \sum_{i \in \text{Clean}} \mathbb{I}_{\text{Isolated}}^{(i)}}_{\text{Business Downtime Cost}} + \underbrace{15.0 \cdot \mathbb{I}_{\text{Contained}}}_{\text{Infection Quarantined}} + \underbrace{1.0}_{\text{Survival}}$$
+$$
+r_t = \underbrace{+50.0 \cdot \mathbb{I}_{\text{Trapped}}}_{\text{Adversary Caught in Decoy}} - \underbrace{100.0 \cdot \mathbb{I}_{\text{Exfiltrated}}}_{\text{Database Breached}} - \underbrace{2.0 \cdot \sum_{i \in \text{Clean}} \mathbb{I}_{\text{Isolated}}^{(i)}}_{\text{Business Downtime Cost}} + \underbrace{15.0 \cdot \mathbb{I}_{\text{Contained}}}_{\text{Infection Quarantined}} + \underbrace{1.0}_{\text{Survival}}
+$$
 
 ---
 
 ### 4. Double DQN Neural Network Architecture
+
 To eliminate the maximization overestimation bias inherent to standard Deep Q-Networks, action selection is decoupled from action evaluation:
 
-$$Y_t^{\text{DoubleQ}} = r_{t+1} + \gamma Q\left(s_{t+1}, \arg\max_{a} Q(s_{t+1}, a; \boldsymbol{\theta}_t); \boldsymbol{\theta}_t^-\right)$$
+$$
+Y_t^{\text{DoubleQ}} = r_{t+1} + \gamma Q\left(s_{t+1}, \arg\max_{a} Q(s_{t+1}, a; \boldsymbol{\theta}_t); \boldsymbol{\theta}_t^-\right)
+$$
 
-$$\mathcal{L}(\boldsymbol{\theta}) = \frac{1}{|B|} \sum_{(s, a, r, s', d) \in B} \text{Smooth}_{L1}\left( Q(s, a; \boldsymbol{\theta}) - Y^{\text{DoubleQ}} \right)$$
+$$
+\mathcal{L}(\boldsymbol{\theta}) = \frac{1}{|B|} \sum_{(s, a, r, s', d) \in B} \text{Smooth}_{L1}\left( Q(s, a; \boldsymbol{\theta}) - Y^{\text{DoubleQ}} \right)
+$$
 
-$$\boldsymbol{\theta}^- \leftarrow \tau \boldsymbol{\theta} + (1 - \tau)\boldsymbol{\theta}^- \quad (\tau = 0.005)$$
+$$
+\boldsymbol{\theta}^- \leftarrow \tau \boldsymbol{\theta} + (1 - \tau)\boldsymbol{\theta}^- \quad (\tau = 0.005)
+$$
 
 ```text
 Input State (64 dims)
@@ -180,7 +169,9 @@ Peak Moving Average Reward    : +437.1 Points
 ```
 
 ### 📁 Generated Fine-Tuning Dataset (`data/fine_tuning_experience.jsonl`)
+
 Every single decision step during interactive fine-tuning is serialized to disk for inspection and offline imitation learning:
+
 ```json
 {
   "timestamp": "2026-10-26 00:45:14",
@@ -223,9 +214,10 @@ The web dashboard is an interactive **Cyber Defense Operations Center**:
 ## 💻 Quick Start (Local Execution)
 
 ### 1. Clone & Set Up Environment
+
 ```bash
-git clone https://github.com/<your-username>/Enterprise-Cyber-Defender.git
-cd "Enterprise-Cyber-Defender"
+git clone https://github.com/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender.git
+cd "Autonomous-Enterprise-Cyber-Defender"
 
 # Create and activate virtual environment
 python -m venv .venv
@@ -237,17 +229,21 @@ pip install -r requirements.txt
 ```
 
 ### 2. Launch the SOC Web Dashboard
+
 ```bash
 python app.py
 ```
+
 Open **`http://localhost:5000`** in your browser.
 
 ### 3. Run the Automated Test Suite (14 Tests)
+
 ```bash
 python -m unittest tests/test_cyber_defense.py -v
 ```
 
 ### 4. Train / Retrain Double DQN Agent
+
 ```bash
 # Resume training using fine-tuning buffer (400 episodes)
 python -m rl_agent.train
@@ -270,8 +266,8 @@ Deploy your interactive Cyber SOC platform live so anyone can access it online.
 2. **Open Bash Console**: Go to the **Consoles** tab $\to$ click **Bash**.
 3. **Clone Your Repository**:
    ```bash
-   git clone https://github.com/<your-username>/Enterprise-Cyber-Defender.git
-   cd "Enterprise-Cyber-Defender"
+   git clone https://github.com/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender.git
+   cd "Autonomous-Enterprise-Cyber-Defender"
    ```
 4. **Create Virtualenv & Install Dependencies**:
    ```bash
@@ -287,14 +283,14 @@ Deploy your interactive Cyber SOC platform live so anyone can access it online.
      /home/<your-username>/.virtualenvs/cyber-env
      ```
    * Under **Code**:
-     * Source code: `/home/<your-username>/Enterprise-Cyber-Defender`
-     * Working directory: `/home/<your-username>/Enterprise-Cyber-Defender`
+     * Source code: `/home/MuhammadAsad29/Autonomous-Enterprise-Cber-Defender`
+     * Working directory: `/home/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender`
    * Click the **WSGI configuration file** link and replace its content with:
      ```python
      import sys
      import os
 
-     project_home = '/home/<your-username>/Enterprise-Cyber-Defender'
+     project_home = '/home/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender'
      if project_home not in sys.path:
          sys.path.insert(0, project_home)
 
@@ -316,7 +312,7 @@ Deploy your interactive Cyber SOC platform live so anyone can access it online.
    * **Start Command**: `gunicorn app:app`
    * **Plan**: `Free`
 5. Click **Create Web Service**. Render will build and launch your live URL:
-   `https://enterprise-cyber-defender.onrender.com`
+   `https://autonomous-enterprise-cyber-defender.onrender.com`
 
 ---
 
@@ -363,19 +359,14 @@ Enterprise Cyber Defender/
 
 ## 📜 MITRE ATT&CK & D3FEND Matrix Mapping
 
-| Tactical Category | MITRE Technique ID | Enterprise Scenario Representation | Blue Team Countermeasure |
-|:---|:---|:---|:---|
-| **Initial Access** | `T1190` | Exploit Public-Facing App (Apache Struts on DMZ-Web-01) | Network Isolation & Service Re-imaging |
-| **Credential Access** | `T1003` / `T1110` | Credential Dumping & SSH Brute-Force on Dev Workstation | Auth Token Revocation & Hash Purging |
-| **Lateral Movement** | `T1021.002` | SMB Remote Services Exploit (EternalBlue on File Server) | Subnet Severing & Quarantine |
-| **Exfiltration** | `T1041` | Direct Exfiltration targeting Crown Jewel Customer DB | High-Priority Database Isolation Alert |
-| **Deception Defenses** | `D3-DEC` | Attacker Lure & Exploit Canary | Decoy Honeypot Alpha Trapping ($+50\text{ Reward}$) |
+| Tactical Category            | MITRE Technique ID    | Enterprise Scenario Representation                       | Blue Team Countermeasure                              |
+| :--------------------------- | :-------------------- | :------------------------------------------------------- | :---------------------------------------------------- |
+| **Initial Access**     | `T1190`             | Exploit Public-Facing App (Apache Struts on DMZ-Web-01)  | Network Isolation & Service Re-imaging                |
+| **Credential Access**  | `T1003` / `T1110` | Credential Dumping & SSH Brute-Force on Dev Workstation  | Auth Token Revocation & Hash Purging                  |
+| **Lateral Movement**   | `T1021.002`         | SMB Remote Services Exploit (EternalBlue on File Server) | Subnet Severing & Quarantine                          |
+| **Exfiltration**       | `T1041`             | Direct Exfiltration targeting Crown Jewel Customer DB    | High-Priority Database Isolation Alert                |
+| **Deception Defenses** | `D3-DEC`            | Attacker Lure & Exploit Canary                           | Decoy Honeypot Alpha Trapping ($+50\text{ Reward}$) |
 
 ---
 
 <div align="center">
-
-**Built with pride by Blue Team Cybersecurity Researchers & AI Engineers.**  
-*Defending critical enterprise infrastructure with autonomous intelligent agents.*
-
-</div>
