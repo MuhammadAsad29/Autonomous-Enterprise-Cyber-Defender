@@ -1,0 +1,35 @@
+name: Sync to Hugging Face Spaces
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  sync-to-hf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push static assets to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create clean orphan branch for HF static deployment
+          git checkout --orphan hf-sync
+          git rm -rf .
+
+          # Only include static web application assets & Space metadata
+          git checkout main -- index.html static/ README.md
+
+          git add index.html static/ README.md
+          git commit -m "Automated sync from GitHub to Hugging Face Space" || echo "No changes to commit"
+
+          # Force push static assets cleanly to Hugging Face Space
+          git push -f "https://M-Asad29:$HF_TOKEN@huggingface.co/spaces/M-Asad29/Autonomous-Enterprise-Cyber-Defender" hf-sync:main
