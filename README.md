@@ -1,5 +1,18 @@
 <div align="center">
 
+# ⚔️ Autonomous Enterprise Cyber Defender
+### Autonomous Blue Team AI Agent with Double Deep Q-Networks (Double DQN)
+**Simulating High-Stakes Multi-Stage APT Attacks, Lateral Movement & Real-Time Deception Grids**
+
+[![GitHub Stars](https://img.shields.io/github/stars/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender?style=for-the-badge&logo=github&color=00f2fe)](https://github.com/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender?style=for-the-badge&logo=github&color=4facfe)](https://github.com/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender/network/members)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%20%7C%203.11-3776ab?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Flask](https://img.shields.io/badge/Flask-SOC%20Dashboard-000000?style=for-the-badge&logo=flask&logoColor=white)](https://palletsprojects.com/p/flask/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+
+</div>
+
 ---
 
 ## 🛡️ Executive Summary
@@ -280,10 +293,10 @@ Deploy your interactive Cyber SOC platform live so anyone can access it online.
    * Select **Manual configuration** $\to$ choose **Python 3.11**.
    * Under **Virtualenv**, set:
      ```text
-     /home/<your-username>/.virtualenvs/cyber-env
+     /home/MuhammadAsad29/.virtualenvs/cyber-env
      ```
    * Under **Code**:
-     * Source code: `/home/MuhammadAsad29/Autonomous-Enterprise-Cber-Defender`
+     * Source code: `/home/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender`
      * Working directory: `/home/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender`
    * Click the **WSGI configuration file** link and replace its content with:
      ```python
@@ -297,7 +310,7 @@ Deploy your interactive Cyber SOC platform live so anyone can access it online.
      from app import app as application
      ```
 6. **Launch**: Click the green **Reload** button and visit:
-   `https://<your-username>.pythonanywhere.com`
+   `https://MuhammadAsad29.pythonanywhere.com`
 
 ---
 
@@ -370,3 +383,8 @@ Enterprise Cyber Defender/
 ---
 
 <div align="center">
+
+### 👨‍💻 Developed by [Muhammad Asad](https://github.com/MuhammadAsad29)
+**Autonomous Enterprise Cyber Defense System** · Powered by Double DQN & PyTorch
+
+</div>

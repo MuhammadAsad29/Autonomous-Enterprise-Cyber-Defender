@@ -19,8 +19,8 @@ This guide walks you through deploying **CyberBattle-RL (Autonomous Enterprise C
 ## Step 2: Upload or Clone the Project
 In the Bash console, clone your GitHub repository or create the project folder:
 ```bash
-git clone https://github.com/<your-username>/Enterprise-Cyber-Defender.git
-cd "Enterprise-Cyber-Defender"
+git clone https://github.com/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender.git
+cd "Autonomous-Enterprise-Cyber-Defender"
 ```
 *(Or upload the zip archive via the PythonAnywhere **Files** tab and extract it with `unzip project.zip`).*
 
@@ -53,30 +53,29 @@ pip install -r requirements.txt
 1. Scroll down to the **Virtualenv** section on the Web tab.
 2. Enter the path to your virtual environment:
    ```text
-   /home/<your-username>/.virtualenvs/cyber-env
+   /home/MuhammadAsad29/.virtualenvs/cyber-env
    ```
 3. Scroll up to the **Code** section:
    - Set **Source code**:
      ```text
-     /home/<your-username>/Enterprise-Cyber-Defender
+     /home/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender
      ```
    - Set **Working directory**:
      ```text
-     /home/<your-username>/Enterprise-Cyber-Defender
+     /home/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender
      ```
-4. Click on the **WSGI configuration file** link (e.g. `/var/www/yourusername_pythonanywhere_com_wsgi.py`).
+4. Click on the **WSGI configuration file** link (e.g. `/var/www/MuhammadAsad29_pythonanywhere_com_wsgi.py`).
 5. Replace everything in that file with:
    ```python
    import sys
    import os
 
-   project_home = '/home/<your-username>/Enterprise-Cyber-Defender'
+   project_home = '/home/MuhammadAsad29/Autonomous-Enterprise-Cyber-Defender'
    if project_home not in sys.path:
        sys.path.insert(0, project_home)
 
    from app import app as application
    ```
-   *(Be sure to replace `<your-username>` with your actual PythonAnywhere username)*.
 6. Click **Save** in the top-right.
 
 ---
