@@ -200,6 +200,9 @@ async function fetchState() {
 }
 
 function renderNetwork(state) {
+    if (state && state.nodes) {
+        populateManualNodeSelect(state.nodes);
+    }
     const visNodes = [];
     currentNodesData = {};
 

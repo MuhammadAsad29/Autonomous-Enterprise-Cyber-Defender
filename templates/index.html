@@ -135,7 +135,16 @@
                         <option value="3">3: Revoke Auth Token</option>
                     </select>
                     <select id="manualTargetNode" class="soc-select">
-                        <!-- Populated dynamically via JS -->
+                        <option value="0">0: Edge-Firewall-Gateway (Perimeter)</option>
+                        <option value="1">1: DMZ-Web-App-01 (DMZ)</option>
+                        <option value="2">2: DMZ-API-Gateway (DMZ)</option>
+                        <option value="3">3: WS-Dev-01 (Corporate-Dev)</option>
+                        <option value="4">4: WS-Finance-02 (Corporate-Finance)</option>
+                        <option value="5">5: WS-HR-03 (Corporate-HR)</option>
+                        <option value="6">6: File-Server-SMB (Infrastructure)</option>
+                        <option value="7">7: Domain-Controller (Infrastructure)</option>
+                        <option value="8">8: Crown-Jewel-Customer-DB (Secure-Vault)</option>
+                        <option value="9">9: Decoy-Honeypot-Alpha (Deception-Grid)</option>
                     </select>
                     <button class="soc-btn secondary" id="executeManualActionBtn">
                         <i class="fa-solid fa-bolt"></i> Execute Action
