@@ -1,6 +1,7 @@
 /**
  * CyberBattle-RL: SOC Mission Control Client
  * Vis.js Network Graph + Chart.js Q-values + Real-time Telemetry Feed
+ * Fixed: Client-side simulation fully enabled for HF Static
  */
 
 let network = null;
@@ -9,6 +10,7 @@ let edgesDataSet = null;
 let qChart = null;
 let autoRunInterval = null;
 let currentNodesData = {};
+let isStaticMode = false;
 
 // Modal Charts
 let modalRewardChart = null;
@@ -26,7 +28,7 @@ const STATUS_COLORS = {
 };
 
 function isStaticEnvironment() {
-    return window.isStaticMode ||
+    return isStaticMode ||
            window.location.protocol === "file:" ||
            window.location.hostname.includes("hf.space") ||
            window.location.hostname.includes("huggingface.co") ||
@@ -54,6 +56,10 @@ function initApp() {
         fetchState();
     } catch (e) {
         console.error("Fetch state error:", e);
+        if (window.SimEngine) {
+            isStaticMode = true;
+            loadStaticState();
+        }
     }
 }
 
@@ -195,21 +201,30 @@ function initQChart() {
 
 // --- 3. Event Listeners ---
 function attachEventListeners() {
-    document.getElementById("stepBtn").addEventListener("click", () => stepSimulation());
-    document.getElementById("resetBtn").addEventListener("click", () => resetSimulation());
-    document.getElementById("autoBtn").addEventListener("click", () => toggleAutoRun());
-    document.getElementById("clearLogBtn").addEventListener("click", () => clearLog());
+    const stepBtn = document.getElementById("stepBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const autoBtn = document.getElementById("autoBtn");
+    const clearLogBtn = document.getElementById("clearLogBtn");
+
+    if (stepBtn) stepBtn.addEventListener("click", () => stepSimulation());
+    if (resetBtn) resetBtn.addEventListener("click", () => resetSimulation());
+    if (autoBtn) autoBtn.addEventListener("click", () => toggleAutoRun());
+    if (clearLogBtn) clearLogBtn.addEventListener("click", () => clearLog());
 
     // Settings
-    document.getElementById("threatSelect").addEventListener("change", (e) => {
+    const threatSelect = document.getElementById("threatSelect");
+    if (threatSelect) threatSelect.addEventListener("change", (e) => {
         updateConfig({ threat_level: e.target.value });
     });
-    document.getElementById("defenseModeSelect").addEventListener("change", (e) => {
+
+    const defenseModeSelect = document.getElementById("defenseModeSelect");
+    if (defenseModeSelect) defenseModeSelect.addEventListener("change", (e) => {
         updateConfig({ defense_mode: e.target.value });
     });
 
     // Manual operator action
-    document.getElementById("executeManualActionBtn").addEventListener("click", () => {
+    const executeManualActionBtn = document.getElementById("executeManualActionBtn");
+    if (executeManualActionBtn) executeManualActionBtn.addEventListener("click", () => {
         const actionType = parseInt(document.getElementById("manualActionType").value, 10);
         const targetNode = parseInt(document.getElementById("manualTargetNode").value, 10);
         const actionId = (actionType * 10) + targetNode;
@@ -217,14 +232,18 @@ function attachEventListeners() {
     });
 
     // Analytics Modal
-    document.getElementById("openAnalyticsBtn").addEventListener("click", () => openAnalyticsModal());
-    document.getElementById("closeAnalyticsModalBtn").addEventListener("click", () => closeAnalyticsModal());
-    document.getElementById("triggerRetrainBtn").addEventListener("click", () => triggerRetrain());
+    const openAnalyticsBtn = document.getElementById("openAnalyticsBtn");
+    const closeAnalyticsModalBtn = document.getElementById("closeAnalyticsModalBtn");
+    const triggerRetrainBtn = document.getElementById("triggerRetrainBtn");
+
+    if (openAnalyticsBtn) openAnalyticsBtn.addEventListener("click", () => openAnalyticsModal());
+    if (closeAnalyticsModalBtn) closeAnalyticsModalBtn.addEventListener("click", () => closeAnalyticsModal());
+    if (triggerRetrainBtn) triggerRetrainBtn.addEventListener("click", () => triggerRetrain());
 }
 
 // --- 4. State & Network Sync ---
 function loadStaticState() {
-    window.isStaticMode = true;
+    isStaticMode = true;
     if (window.SimEngine) {
         const data = window.SimEngine.getState();
         renderNetwork(data.network_state);
@@ -232,6 +251,9 @@ function loadStaticState() {
         renderQValues(data.top_actions);
         populateManualNodeSelect(data.network_state.nodes);
         appendLog("[SYSTEM READY] Autonomous Enterprise SOC online. Decoy grid active.", "blue", "SYS");
+    } else {
+        console.error("SimEngine not loaded! Check sim_engine.js script tag.");
+        appendLog("[ERROR] Simulation engine failed to load. Check browser console.", "red", "SYS");
     }
 }
 
@@ -249,7 +271,8 @@ async function fetchState() {
         updateScoreboard(data);
         populateManualNodeSelect(data.nodes);
     } catch (err) {
-        console.log("[Static Mode] Activating client-side simulation engine...");
+        console.log("[Static Mode] Activating client-side simulation engine...", err);
+        isStaticMode = true;
         loadStaticState();
     }
 }
@@ -316,22 +339,27 @@ function renderNetwork(state) {
 
 function updateScoreboard(state) {
     // Step counter
-    document.getElementById("stepCounterVal").innerText = `${state.step} / ${state.max_steps}`;
+    const stepEl = document.getElementById("stepCounterVal");
+    if (stepEl) stepEl.innerText = `${state.step} / ${state.max_steps}`;
 
     // Cumulative reward
     const rewEl = document.getElementById("cumulativeRewardVal");
-    const rewVal = state.cumulative_reward || 0.0;
-    rewEl.innerText = (rewVal >= 0 ? `+${rewVal}` : `${rewVal}`);
-    rewEl.style.color = rewVal >= 0 ? "var(--accent-emerald)" : "var(--accent-crimson)";
+    if (rewEl) {
+        const rewVal = state.cumulative_reward || 0.0;
+        rewEl.innerText = (rewVal >= 0 ? `+${rewVal}` : `${rewVal}`);
+        rewEl.style.color = rewVal >= 0 ? "var(--accent-emerald)" : "var(--accent-crimson)";
+    }
 
     // Crown Jewel DB Badge
     const dbBadge = document.getElementById("dbStatusBadge");
-    if (state.database_exfiltrated) {
-        dbBadge.className = "tele-val breached";
-        dbBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> EXFILTRATED`;
-    } else {
-        dbBadge.className = "tele-val safe";
-        dbBadge.innerHTML = `<i class="fa-solid fa-database"></i> SECURE`;
+    if (dbBadge) {
+        if (state.database_exfiltrated) {
+            dbBadge.className = "tele-val breached";
+            dbBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> EXFILTRATED`;
+        } else {
+            dbBadge.className = "tele-val safe";
+            dbBadge.innerHTML = `<i class="fa-solid fa-database"></i> SECURE`;
+        }
     }
 
     // Scores
@@ -339,7 +367,7 @@ function updateScoreboard(state) {
     let isolated = 0;
     let downtimePenalty = 0;
 
-    state.nodes.forEach((n) => {
+    (state.nodes || []).forEach((n) => {
         if (n.status === "Compromised" || n.status === "Owned (Admin)") infections++;
         if (n.is_isolated) {
             isolated++;
@@ -347,29 +375,38 @@ function updateScoreboard(state) {
         }
     });
 
-    document.getElementById("scoreInfections").innerText = infections;
-    document.getElementById("scoreIsolated").innerText = isolated;
-    document.getElementById("scoreStolenTokens").innerText = state.total_stolen_tokens || 0;
+    const scoreInfections = document.getElementById("scoreInfections");
+    if (scoreInfections) scoreInfections.innerText = infections;
+
+    const scoreIsolated = document.getElementById("scoreIsolated");
+    if (scoreIsolated) scoreIsolated.innerText = isolated;
+
+    const scoreStolenTokens = document.getElementById("scoreStolenTokens");
+    if (scoreStolenTokens) scoreStolenTokens.innerText = state.total_stolen_tokens || 0;
 
     const downtimeCost = state.cumulative_downtime_penalty !== undefined 
         ? state.cumulative_downtime_penalty 
         : downtimePenalty;
 
     const downtimeEl = document.getElementById("scoreDowntimeCost");
-    downtimeEl.innerText = downtimeCost > 0 ? `-${downtimeCost} pts` : `0 pts`;
-    downtimeEl.style.color = downtimeCost > 0 ? "var(--accent-crimson)" : "var(--accent-emerald)";
+    if (downtimeEl) {
+        downtimeEl.innerText = downtimeCost > 0 ? `-${downtimeCost} pts` : `0 pts`;
+        downtimeEl.style.color = downtimeCost > 0 ? "var(--accent-crimson)" : "var(--accent-emerald)";
+    }
 }
 
 function populateManualNodeSelect(nodes) {
     const select = document.getElementById("manualTargetNode");
-    if (select.children.length === 0) {
-        nodes.forEach((n) => {
-            const opt = document.createElement("option");
-            opt.value = n.id;
-            opt.innerText = `${n.id}: ${n.name} (${n.subnet})`;
-            select.appendChild(opt);
-        });
-    }
+    if (!select) return;
+    
+    // Always repopulate to ensure latest node data
+    select.innerHTML = "";
+    (nodes || []).forEach((n) => {
+        const opt = document.createElement("option");
+        opt.value = n.id;
+        opt.innerText = `${n.id}: ${n.name} (${n.subnet})`;
+        select.appendChild(opt);
+    });
 }
 
 // --- 5. Simulation Execution ---
@@ -418,7 +455,7 @@ function processStepResult(data) {
 
 async function stepSimulation(manualActionId = null) {
     if (isStaticEnvironment() && window.SimEngine) {
-        window.isStaticMode = true;
+        isStaticMode = true;
         const data = window.SimEngine.step(manualActionId);
         processStepResult(data);
         return;
@@ -436,10 +473,12 @@ async function stepSimulation(manualActionId = null) {
         processStepResult(data);
     } catch (err) {
         console.error("Step execution failed, switching to static mode:", err);
-        window.isStaticMode = true;
+        isStaticMode = true;
         if (window.SimEngine) {
             const data = window.SimEngine.step(manualActionId);
             processStepResult(data);
+        } else {
+            appendLog("[ERROR] Backend unavailable and SimEngine not loaded.", "red", "SYS");
         }
     }
 }
@@ -448,7 +487,7 @@ async function resetSimulation() {
     if (autoRunInterval) toggleAutoRun();
 
     if (isStaticEnvironment() && window.SimEngine) {
-        window.isStaticMode = true;
+        isStaticMode = true;
         const data = window.SimEngine.reset();
         renderNetwork(data.network_state);
         updateScoreboard(data.network_state);
@@ -470,7 +509,7 @@ async function resetSimulation() {
         if (qContainer) qContainer.innerHTML = `<div class="placeholder-q">Network reset to perimeter baseline.</div>`;
     } catch (err) {
         console.error("Reset failed, switching to static mode:", err);
-        window.isStaticMode = true;
+        isStaticMode = true;
         if (window.SimEngine) {
             const data = window.SimEngine.reset();
             renderNetwork(data.network_state);
@@ -479,6 +518,8 @@ async function resetSimulation() {
             appendLog("[SYSTEM] Network topology reset to perimeter baseline.", "system", "SYS");
             const qContainer = document.getElementById("topQActionsList");
             if (qContainer) qContainer.innerHTML = `<div class="placeholder-q">Network reset to perimeter baseline.</div>`;
+        } else {
+            appendLog("[ERROR] Backend unavailable and SimEngine not loaded.", "red", "SYS");
         }
     }
 }
@@ -510,15 +551,16 @@ function toggleAutoRun() {
     if (autoRunInterval) {
         clearInterval(autoRunInterval);
         autoRunInterval = null;
-        autoBtn.innerHTML = `<i class="fa-solid fa-play"></i> Auto Run`;
-        autoBtn.className = "soc-btn success";
-        liveIndicator.innerText = "STANDBY";
+        if (autoBtn) autoBtn.innerHTML = `<i class="fa-solid fa-play"></i> Auto Run`;
+        if (autoBtn) autoBtn.className = "soc-btn success";
+        if (liveIndicator) liveIndicator.innerText = "STANDBY";
     } else {
-        const speed = parseInt(document.getElementById("speedSelect").value, 10) || 600;
+        const speedSelect = document.getElementById("speedSelect");
+        const speed = speedSelect ? parseInt(speedSelect.value, 10) || 600 : 600;
         autoRunInterval = setInterval(() => stepSimulation(), speed);
-        autoBtn.innerHTML = `<i class="fa-solid fa-pause"></i> Pause`;
-        autoBtn.className = "soc-btn danger";
-        liveIndicator.innerText = "ACTIVE DEFENSE";
+        if (autoBtn) autoBtn.innerHTML = `<i class="fa-solid fa-pause"></i> Pause`;
+        if (autoBtn) autoBtn.className = "soc-btn danger";
+        if (liveIndicator) liveIndicator.innerText = "ACTIVE DEFENSE";
     }
 }
 
@@ -527,6 +569,7 @@ function renderQValues(topActions) {
     if (!topActions || topActions.length === 0) return;
 
     const container = document.getElementById("topQActionsList");
+    if (!container) return;
     container.innerHTML = "";
 
     const labels = [];
@@ -555,6 +598,7 @@ function renderQValues(topActions) {
 
 function appendLog(text, type = "blue", tag = "BLUE") {
     const feed = document.getElementById("telemetryFeed");
+    if (!feed) return;
     const now = new Date();
     const timeStr = `[${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}]`;
 
@@ -576,24 +620,31 @@ function appendLog(text, type = "blue", tag = "BLUE") {
 }
 
 function clearLog() {
-    document.getElementById("telemetryFeed").innerHTML = "";
+    const feed = document.getElementById("telemetryFeed");
+    if (feed) feed.innerHTML = "";
 }
 
 function inspectNode(nodeId) {
     const node = currentNodesData[nodeId];
     if (!node) return;
 
-    document.getElementById("inspectNodeName").innerText = `${node.name} (${node.ip})`;
-    document.getElementById("inspectNodeSubnet").innerText = node.subnet;
-    document.getElementById("inspectNodeVuln").innerText = node.vulnerability;
-    document.getElementById("inspectNodeAlert").innerText = `${(node.alert_level * 100).toFixed(0)}% (Attacks: ${node.times_attacked})`;
-    document.getElementById("inspectNodeStatus").innerText = `${node.status} ${node.is_isolated ? "[ISOLATED]" : ""}`;
+    const inspectNodeName = document.getElementById("inspectNodeName");
+    const inspectNodeSubnet = document.getElementById("inspectNodeSubnet");
+    const inspectNodeVuln = document.getElementById("inspectNodeVuln");
+    const inspectNodeAlert = document.getElementById("inspectNodeAlert");
+    const inspectNodeStatus = document.getElementById("inspectNodeStatus");
+
+    if (inspectNodeName) inspectNodeName.innerText = `${node.name} (${node.ip})`;
+    if (inspectNodeSubnet) inspectNodeSubnet.innerText = node.subnet;
+    if (inspectNodeVuln) inspectNodeVuln.innerText = node.vulnerability;
+    if (inspectNodeAlert) inspectNodeAlert.innerText = `${(node.alert_level * 100).toFixed(0)}% (Attacks: ${node.times_attacked})`;
+    if (inspectNodeStatus) inspectNodeStatus.innerText = `${node.status} ${node.is_isolated ? "[ISOLATED]" : ""}`;
 }
 
 // --- 7. RL Training Analytics Modal ---
 async function openAnalyticsModal() {
     const modal = document.getElementById("analyticsModal");
-    modal.classList.add("active");
+    if (modal) modal.classList.add("active");
 
     if (isStaticEnvironment() && window.SimEngine) {
         renderAnalyticsCharts(window.SimEngine.getMetrics());
@@ -614,89 +665,101 @@ async function openAnalyticsModal() {
 }
 
 function closeAnalyticsModal() {
-    document.getElementById("analyticsModal").classList.remove("active");
+    const modal = document.getElementById("analyticsModal");
+    if (modal) modal.classList.remove("active");
 }
 
 function renderAnalyticsCharts(metrics) {
     if (!metrics) return;
 
     // Update pill values
-    if (metrics.num_episodes) document.getElementById("mSummaryEpisodes").innerText = metrics.num_episodes;
-    if (metrics.final_win_rate_pct) document.getElementById("mSummaryWinRate").innerText = `${metrics.final_win_rate_pct}%`;
-    if (metrics.outcomes && metrics.outcomes.DEFENDER_WON_TRAPPED) {
-        document.getElementById("mSummaryTrapped").innerText = metrics.outcomes.DEFENDER_WON_TRAPPED;
+    const mSummaryEpisodes = document.getElementById("mSummaryEpisodes");
+    const mSummaryWinRate = document.getElementById("mSummaryWinRate");
+    const mSummaryTrapped = document.getElementById("mSummaryTrapped");
+    const mSummaryEpsilon = document.getElementById("mSummaryEpsilon");
+
+    if (metrics.num_episodes && mSummaryEpisodes) mSummaryEpisodes.innerText = metrics.num_episodes;
+    if (metrics.final_win_rate_pct && mSummaryWinRate) mSummaryWinRate.innerText = `${metrics.final_win_rate_pct}%`;
+    if (metrics.outcomes && metrics.outcomes.DEFENDER_WON_TRAPPED && mSummaryTrapped) {
+        mSummaryTrapped.innerText = metrics.outcomes.DEFENDER_WON_TRAPPED;
     }
-    if (metrics.final_epsilon) document.getElementById("mSummaryEpsilon").innerText = metrics.final_epsilon;
+    if (metrics.final_epsilon && mSummaryEpsilon) mSummaryEpsilon.innerText = metrics.final_epsilon;
 
     // 1. Reward & Moving Average Chart
-    const epLabels = metrics.episode_rewards.map((_, i) => `Ep ${i + 1}`);
-    const ctxReward = document.getElementById("modalRewardChart").getContext("2d");
-    if (modalRewardChart) modalRewardChart.destroy();
-    modalRewardChart = new Chart(ctxReward, {
-        type: "line",
-        data: {
-            labels: epLabels,
-            datasets: [
-                {
-                    label: "Episode Reward",
-                    data: metrics.episode_rewards,
-                    borderColor: "rgba(0, 242, 254, 0.4)",
-                    backgroundColor: "transparent",
-                    borderWidth: 1,
-                    pointRadius: 2,
-                },
-                {
-                    label: "Moving Average (window=25)",
-                    data: metrics.moving_avg_rewards,
-                    borderColor: "#10b981",
-                    backgroundColor: "transparent",
-                    borderWidth: 2.5,
-                    pointRadius: 0,
-                },
-            ],
-        },
-        options: getChartDefaultOptions("Reward Points"),
-    });
+    const epLabels = (metrics.episode_rewards || []).map((_, i) => `Ep ${i + 1}`);
+    const ctxReward = document.getElementById("modalRewardChart");
+    if (ctxReward) {
+        if (modalRewardChart) modalRewardChart.destroy();
+        modalRewardChart = new Chart(ctxReward.getContext("2d"), {
+            type: "line",
+            data: {
+                labels: epLabels,
+                datasets: [
+                    {
+                        label: "Episode Reward",
+                        data: metrics.episode_rewards || [],
+                        borderColor: "rgba(0, 242, 254, 0.4)",
+                        backgroundColor: "transparent",
+                        borderWidth: 1,
+                        pointRadius: 2,
+                    },
+                    {
+                        label: "Moving Average (window=25)",
+                        data: metrics.moving_avg_rewards || [],
+                        borderColor: "#10b981",
+                        backgroundColor: "transparent",
+                        borderWidth: 2.5,
+                        pointRadius: 0,
+                    },
+                ],
+            },
+            options: getChartDefaultOptions("Reward Points"),
+        });
+    }
 
     // 2. Win Rate Progression Chart
-    const ctxWin = document.getElementById("modalWinRateChart").getContext("2d");
-    if (modalWinRateChart) modalWinRateChart.destroy();
-    modalWinRateChart = new Chart(ctxWin, {
-        type: "line",
-        data: {
-            labels: epLabels,
-            datasets: [{
-                label: "Win Rate (%)",
-                data: metrics.win_rates,
-                borderColor: "#a855f7",
-                backgroundColor: "rgba(168, 85, 247, 0.15)",
-                fill: true,
-                borderWidth: 2,
-                pointRadius: 0,
-            }],
-        },
-        options: getChartDefaultOptions("Win Rate %", 0, 100),
-    });
+    const ctxWin = document.getElementById("modalWinRateChart");
+    if (ctxWin) {
+        if (modalWinRateChart) modalWinRateChart.destroy();
+        modalWinRateChart = new Chart(ctxWin.getContext("2d"), {
+            type: "line",
+            data: {
+                labels: epLabels,
+                datasets: [{
+                    label: "Win Rate (%)",
+                    data: metrics.win_rates || [],
+                    borderColor: "#a855f7",
+                    backgroundColor: "rgba(168, 85, 247, 0.15)",
+                    fill: true,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                }],
+            },
+            options: getChartDefaultOptions("Win Rate %", 0, 100),
+        });
+    }
 
     // 3. Loss Decay Chart
-    const lossLabels = metrics.loss_history.map((_, i) => `${i + 1}`);
-    const ctxLoss = document.getElementById("modalLossChart").getContext("2d");
-    if (modalLossChart) modalLossChart.destroy();
-    modalLossChart = new Chart(ctxLoss, {
-        type: "line",
-        data: {
-            labels: lossLabels,
-            datasets: [{
-                label: "Huber Loss",
-                data: metrics.loss_history,
-                borderColor: "#f59e0b",
-                backgroundColor: "transparent",
-                borderWidth: 1.5,
-                pointRadius: 0,
-            }],
-        },
-        options: getChartDefaultOptions("Training Loss"),
-    });
+    const lossLabels = (metrics.loss_history || []).map((_, i) => `${i + 1}`);
+    const ctxLoss = document.getElementById("modalLossChart");
+    if (ctxLoss) {
+        if (modalLossChart) modalLossChart.destroy();
+        modalLossChart = new Chart(ctxLoss.getContext("2d"), {
+            type: "line",
+            data: {
+                labels: lossLabels,
+                datasets: [{
+                    label: "Huber Loss",
+                    data: metrics.loss_history || [],
+                    borderColor: "#f59e0b",
+                    backgroundColor: "transparent",
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                }],
+            },
+            options: getChartDefaultOptions("Training Loss"),
+        });
+    }
 }
 
 function getChartDefaultOptions(yAxisLabel, minY = null, maxY = null) {
@@ -724,16 +787,21 @@ function getChartDefaultOptions(yAxisLabel, minY = null, maxY = null) {
 }
 
 async function triggerRetrain() {
-    const episodes = parseInt(document.getElementById("retrainEpisodesSelect").value, 10) || 25;
+    const episodesSelect = document.getElementById("retrainEpisodesSelect");
+    const episodes = episodesSelect ? parseInt(episodesSelect.value, 10) || 25 : 25;
     const msgEl = document.getElementById("trainStatusMsg");
-    msgEl.innerText = `Running ${episodes} training episodes...`;
-    msgEl.style.color = "var(--accent-amber)";
+    if (msgEl) {
+        msgEl.innerText = `Running ${episodes} training episodes...`;
+        msgEl.style.color = "var(--accent-amber)";
+    }
 
     if (isStaticEnvironment() && window.SimEngine) {
         setTimeout(() => {
             const metrics = window.SimEngine.getMetrics();
-            msgEl.innerText = `Completed ${episodes} episodes! Batch Win Rate: 95.2% | Overall: 93.8% | Avg Reward: +380.5`;
-            msgEl.style.color = "var(--accent-emerald)";
+            if (msgEl) {
+                msgEl.innerText = `Completed ${episodes} episodes! Batch Win Rate: 95.2% | Overall: 93.8% | Avg Reward: +380.5`;
+                msgEl.style.color = "var(--accent-emerald)";
+            }
             renderAnalyticsCharts(metrics);
             appendLog(`Model fine-tuned (${episodes} ep): Batch Win Rate: 95.2%, Overall: 93.8%`, "system", "SYS");
         }, 500);
@@ -748,15 +816,15 @@ async function triggerRetrain() {
         });
         const data = await res.json();
         if (data.status === "success") {
-            msgEl.innerText = `Completed ${episodes} episodes! Batch Win Rate: ${data.batch_win_rate}% | Overall: ${data.overall_win_rate}% | Avg Reward: +${data.average_reward}`;
-            msgEl.style.color = "var(--accent-emerald)";
+            if (msgEl) {
+                msgEl.innerText = `Completed ${episodes} episodes! Batch Win Rate: ${data.batch_win_rate}% | Overall: ${data.overall_win_rate}% | Avg Reward: +${data.average_reward}`;
+                msgEl.style.color = "var(--accent-emerald)";
+            }
 
-            // Update top summary pill metrics in modal
             if (data.total_episodes) document.getElementById("mSummaryEpisodes").innerText = data.total_episodes;
             if (data.overall_win_rate) document.getElementById("mSummaryWinRate").innerText = `${data.overall_win_rate}%`;
             if (data.total_trapped) document.getElementById("mSummaryTrapped").innerText = data.total_trapped;
 
-            // Re-fetch and re-render charts live
             try {
                 const metricsRes = await fetch("/api/metrics");
                 const metricsData = await metricsRes.json();
@@ -767,11 +835,15 @@ async function triggerRetrain() {
 
             appendLog(`Model fine-tuned (${episodes} ep): Batch Win Rate: ${data.batch_win_rate}%, Overall: ${data.overall_win_rate}%, Avg Reward: +${data.average_reward}`, "system", "SYS");
         } else {
-            msgEl.innerText = `Training error: ${data.message}`;
-            msgEl.style.color = "var(--accent-crimson)";
+            if (msgEl) {
+                msgEl.innerText = `Training error: ${data.message}`;
+                msgEl.style.color = "var(--accent-crimson)";
+            }
         }
     } catch (err) {
-        msgEl.innerText = "Training request failed.";
-        msgEl.style.color = "var(--accent-crimson)";
+        if (msgEl) {
+            msgEl.innerText = "Training request failed.";
+            msgEl.style.color = "var(--accent-crimson)";
+        }
     }
 }
