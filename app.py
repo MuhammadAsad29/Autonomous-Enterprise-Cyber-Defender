@@ -1,137 +1,170 @@
-import streamlit as st
+"""
+CyberBattle-RL: Flask WSGI Application
+Serves the static UI for GitHub Pages and PythonAnywhere deployment.
+The frontend (index.html, static/js, static/css) handles all simulation
+logic client-side via the standalone SimEngine.
+"""
+
+import os
 import json
 import numpy as np
-import torch
-import os
-import sys
+from flask import Flask, request, send_from_directory, jsonify
 
-# LOCAL PATH FIX: ensure rl_agent is importable even on Cloud
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from rl_agent.train import train_cyber_defender
 
-# Safe import with fallback
-try:
-    from rl_agent.train import train_agent
-    TRAIN_AVAILABLE = True
-except ImportError:
-    TRAIN_AVAILABLE = False
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(BASE_DIR, "models")
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
-from rl_agent.double_dqn import DoubleDQNAgent
-from cyberbattle_env.env import CyberDefenderEnv
-from cyberbattle_env.attacker import ThreatLevel
+app = Flask(__name__)
 
-# Page config
-st.set_page_config(
-    page_title="CyberBattle-RL | Enterprise Cyber Defender",
-    page_icon="🛡️",
-    layout="wide"
-)
+# Serve the main UI
+@app.route("/")
+def index():
+    return send_from_directory(".", "index.html")
 
-# Custom CSS
-st.markdown("""
-<style>
-    .main { padding: 20px; }
-    .stButton > button { width: 100%; margin: 5px 0; }
-    .metric-card { background: #0e1626; padding: 15px; border-radius: 10; margin: 10px 0; }
-</style>
-""", unsafe_allow_html=True)
 
-st.title("🛡️ Autonomous Enterprise Cyber Defender")
-st.subheader("Double DQN with Experience Replay")
+# Serve static assets (css, js) for GitHub Pages compatibility
+@app.route("/static/<path:path>")
+def serve_static(path):
+    return send_from_directory("static", path)
 
-# Sidebar controls
-st.sidebar.header("⚙️ Controls")
-defense_mode = st.sidebar.radio("Defense Mode", ["Double DQN", "Heuristic", "Random"])
-threat_level = st.sidebar.selectbox("Threat Level", ["Aggressive APT", "Stealthy Ransomware", "Script Kiddie"])
 
-# Environment init
-@st.cache_resource
-def init_env():
-    env = CyberDefenderEnv(threat_level=ThreatLevel.AGGRESSIVE_APT, max_steps=50)
-    agent = DoubleDQNAgent(state_dim=64, action_dim=40)
-    
-    model_path = "models/double_dqn_defender.pth"
-    if os.path.exists(model_path):
-        agent.load_checkpoint(model_path)
-    
-    return env, env.reset()
+# API endpoint for current state (optional - for future backend integration)
+@app.route("/api/state", methods=["GET"])
+def api_state():
+    """Return empty state for static mode - client-side SimEngine handles everything."""
+    return jsonify({
+        "network_state": {
+            "nodes": [],
+            "edges": [],
+            "step": 0,
+            "max_steps": 50,
+            "active_infections": 0,
+            "isolated_hosts": 0,
+            "total_stolen_tokens": 0,
+            "cumulative_reward": 0.0,
+            "database_exfiltrated": False,
+            "trapped_in_honeypot": False,
+            "threat_level": "Aggressive APT (State-Sponsored)",
+            "attacker_stage": "RECON",
+        },
+        "top_actions": [],
+        "status": "success",
+    })
 
-env, current_obs = init_env()
-cumulative_reward = 0.0
-step_count = 0
 
-# Main interface
-col1, col2 = st.columns([2, 1])
+# API endpoint for simulation step (optional)
+@app.route("/api/step", methods=["POST"])
+def api_step():
+    """Placeholder step endpoint for static mode."""
+    return jsonify({"error": "Use client-side SimEngine for simulation"}), 400
 
-with col1:
-    st.markdown("### 📊 Network Topology")
-    
-    state = env.get_full_state_dict()
-    nodes = state.get("nodes", [])
-    if nodes:
-        for node in nodes[:3]:
-            st.markdown(f"- **{node.get('name', 'Unknown')}**: {node.get('status', 'Unknown')}")
-    
-    if st.button("▶️ Step Forward"):
-        action, q_vals = agent.select_action(current_obs, epsilon=0.0)
-        next_obs, reward, done, info = env.step(action)
-        current_obs = next_obs
-        cumulative_reward += reward
-        step_count += 1
-        st.success(f"Step {step_count} | Reward: +{reward:.1f} | Total: +{cumulative_reward:.1f}")
-        
-        if done:
-            st.error(f"Episode finished: {info.get('result', 'Unknown')}")
-            env, current_obs = init_env()
-            cumulative_reward = 0.0
-            step_count = 0
 
-with col2:
-    st.markdown("### 📈 Q-Values Top 5")
-    
-    action, q_vals = agent.select_action(current_obs, epsilon=0.0)
-    sorted_q = sorted(enumerate(q_vals), key=lambda x: x[1], reverse=True)[:5]
-    
-    for idx, q_val in sorted_q:
-        action_type = idx // 10
-        target = idx % 10
-        st.write(f"**{action_type} → {target}**: Q = {q_val:.2f}")
-    
-    st.markdown(f"**Cumulative Reward**: +{cumulative_reward:.1f}")
-    st.markdown(f"**Step**: {step_count}/50")
+# API endpoint for reset (optional)
+@app.route("/api/reset", methods=["POST"])
+def api_reset():
+    """Placeholder reset endpoint for static mode."""
+    return jsonify({"message": "Reset initiated - use client-side controls"}), 200
 
-# Auto-run section
-st.sidebar.markdown("---")
-if st.sidebar.button("🚀 Auto Run 10 Steps"):
-    for _ in range(10):
-        if step_count >= 50:
-            break
-        action, q_vals = agent.select_action(current_obs, epsilon=0.0)
-        next_obs, reward, done, info = env.step(action)
-        current_obs = next_obs
-        cumulative_reward += reward
-        step_count += 1
-        if done:
-            break
-    st.rerun()
 
-# Training section (only if import successful)
-st.sidebar.markdown("---")
-st.sidebar.header("🧠 Training")
-if TRAIN_AVAILABLE:
-    if st.sidebar.button("📚 Train Agent (25 ep)"):
-        with st.spinner("Training in progress..."):
-            rewards = train_agent(episodes=25, env=env)
-        st.sidebar.success(f"Training complete! Avg reward: {np.mean(rewards[-5:]):.1f}")
-else:
-    st.sidebar.info("Training module not available. Check rl_agent folder.")
-    st.sidebar.caption("To enable training, ensure rl_agent/train.py exists with train_agent function.")
+# API endpoint for configuration (optional)
+@app.route("/api/config", methods=["POST"])
+def api_config():
+    """Placeholder config endpoint for static mode."""
+    return jsonify({"message": "Config update - use client-side controls"}), 200
 
-# Footer
-st.markdown("---")
-st.caption("""📝 **Note**: Model weights `models/double_dqn_defender.pth` required for inference.
-🔧 **Double DQN Agent** working normally. Training feature depends on module availability.""")
 
-# Required at bottom
+# API endpoint for metrics (optional)
+@app.route("/api/metrics", methods=["GET"])
+def api_metrics():
+    """Return actual training metrics from file for dashboard display."""
+    try:
+        metrics_path = os.path.join(MODELS_DIR, "training_metrics.json")
+        if os.path.exists(metrics_path):
+            with open(metrics_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return jsonify(data)
+        else:
+            return jsonify({
+                "num_episodes": 0,
+                "final_win_rate_pct": 0.0,
+                "recent_batch_win_rate_pct": 0.0,
+                "final_epsilon": 0.05,
+                "outcomes": {
+                    "DEFENDER_WON_TRAPPED": 0,
+                    "DEFENDER_WON_TIMEOUT": 0,
+                    "ATTACKER_WON_BREACH": 0,
+                },
+                "loss_history": [],
+                "win_rates": [],
+                "episode_rewards": [],
+                "moving_avg_rewards": [],
+            })
+    except Exception as e:
+        print(f"[!] Error loading metrics: {e}")
+        return jsonify({"error": "Could not load metrics"}), 500
+
+
+# API endpoint for training (optional)
+@app.route("/api/train", methods=["POST"])
+def api_train():
+    """Run fine-tuning in-process and return actual metrics for the UI."""
+    try:
+        data = request.get_json(silent=True) or {}
+        episodes = int(data.get("episodes", 25))
+        episodes = max(1, episodes)
+
+        metrics = train_cyber_defender(
+            num_episodes=episodes,
+            max_steps_per_episode=40,
+            save_path=os.path.join(MODELS_DIR, "double_dqn_defender.pth"),
+            metrics_path=os.path.join(MODELS_DIR, "training_metrics.json"),
+            replay_path=os.path.join(MODELS_DIR, "replay_buffer.pth"),
+            verbose=False,
+        )
+
+        jsonl_path = os.path.join(DATA_DIR, "fine_tuning_experience.jsonl")
+        jsonl_lines = 0
+        if os.path.exists(jsonl_path):
+            with open(jsonl_path, "r", encoding="utf-8") as f:
+                jsonl_lines = sum(1 for _ in f)
+
+        outcome_counts = metrics.get("outcomes", {})
+        total_trapped = outcome_counts.get("DEFENDER_WON_TRAPPED", 0)
+        overall_win_rate = float(metrics.get("final_win_rate_pct", 0.0))
+        batch_win_rate = float(metrics.get("win_rates", [])[-1]) if metrics.get("win_rates") else overall_win_rate
+        average_reward = float(np.mean(metrics.get("episode_rewards", []))) if metrics.get("episode_rewards") else 0.0
+
+        response = {
+            "status": "success",
+            "episodes_trained": episodes,
+            "total_episodes": metrics.get("num_episodes", episodes),
+            "win_rate": overall_win_rate,
+            "overall_win_rate": overall_win_rate,
+            "batch_win_rate": batch_win_rate,
+            "average_reward": round(average_reward, 1),
+            "total_trapped": total_trapped,
+            "jsonl_entries": jsonl_lines,
+            "output": "",
+        }
+
+        return jsonify(response)
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
+# Serve favicon if exists
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(
+        "static", "favicon.ico", cache_timeout=0
+    ) if os.path.exists("static/favicon.ico") else ("", 204)
+
+
 if __name__ == "__main__":
-    import os
-    main()
+    app.run(host="0.0.0.0", port=8080)

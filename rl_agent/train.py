@@ -1,11 +1,14 @@
 """
 Pre-training and Evaluation pipeline for Double DQN Cyber Defender Agent.
 Trains agent against multi-stage APT attacker and generates performance telemetry.
+Also supports automatic conversion of JSONL fine-tuning experience.
 """
 
 import os
 import json
 import time
+import subprocess
+import datetime
 from typing import Dict, List, Any
 import numpy as np
 import torch
@@ -13,6 +16,7 @@ import torch
 from cyberbattle_env.env import CyberDefenderEnv
 from cyberbattle_env.attacker import ThreatLevel
 from rl_agent.double_dqn import DoubleDQNAgent
+from convert_jsonl import convert_jsonl_to_replay_buffer
 
 
 def train_cyber_defender(
@@ -29,6 +33,29 @@ def train_cyber_defender(
     Trains the Double DQN agent on the enterprise network against the APT threat actor.
     Can resume from existing checkpoints and incorporate saved fine-tuning experience.
     """
+    # --- AUTOMATIC JSONL TO REPLAY BUFFER CONVERSION ---
+    # Convert JSONL fine-tuning experience to PyTorch replay buffer format
+    # before training starts. This allows seamless fine-tuning on existing data.
+    jsonl_path = os.path.join(os.path.dirname(__file__), "..", "data", "fine_tuning_experience.jsonl")
+    buffer_path = os.path.join(os.path.dirname(__file__), "..", "models", "replay_buffer.pth")
+
+    if os.path.exists(jsonl_path):
+        print(f"[*] Checking for fine-tuning experience: {jsonl_path}")
+        try:
+            convert_jsonl_to_replay_buffer(
+                jsonl_path=jsonl_path,
+                buffer_path=buffer_path,
+                buffer_capacity=50000,
+                state_dim=64,
+            )
+            print(f"[+] Conversion complete. Replay buffer ready for training.")
+        except Exception as e:
+            print(f"[!] Conversion warning: {e}")
+            print(f"[*] Continuing training without JSONL fine-tuning data.")
+    else:
+        print(f"[*] No JSONL found at: {jsonl_path}")
+        print(f"[*] Starting training without fine-tuning data.")
+
     env = CyberDefenderEnv(threat_level=threat_level, max_steps=max_steps_per_episode)
     agent = DoubleDQNAgent(state_dim=64, action_dim=40)
 
@@ -38,7 +65,7 @@ def train_cyber_defender(
         try:
             agent.load_checkpoint(save_path)
             is_resumed = True
-            print(f"[✓] Loaded existing model weights from: {save_path}")
+            print(f"[+] Loaded existing model weights from: {save_path}")
         except Exception as e:
             print(f"[!] Warning: Could not load model checkpoint ({e}). Starting fresh.")
 
@@ -46,7 +73,7 @@ def train_cyber_defender(
     if resume and os.path.exists(replay_path):
         try:
             agent.replay_buffer.load_from_disk(replay_path)
-            print(f"[✓] Loaded {len(agent.replay_buffer)} fine-tuning transitions into Experience Replay Buffer!")
+            print(f"[+] Loaded {len(agent.replay_buffer)} fine-tuning transitions into Experience Replay Buffer!")
         except Exception as e:
             print(f"[!] Warning: Could not load replay buffer ({e}).")
 
@@ -60,6 +87,13 @@ def train_cyber_defender(
 
     epsilon_end = 0.05
     epsilon = epsilon_start
+
+    jsonl_path = os.path.join(os.path.dirname(__file__), "..", "data", "fine_tuning_experience.jsonl")
+    os.makedirs(os.path.dirname(jsonl_path), exist_ok=True)
+
+    def append_transition(entry: Dict[str, Any]):
+        with open(jsonl_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
 
     # Metrics tracking
     episode_rewards: List[float] = []
@@ -94,6 +128,24 @@ def train_cyber_defender(
 
             state = next_state
             episode_reward += reward
+
+            append_transition({
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "fine_tune_episode": episode,
+                "step": step_count,
+                "action_id": int(action),
+                "action_name": env.ACTION_NAMES[action // 10] if 0 <= action // 10 < len(env.ACTION_NAMES) else "Unknown Action",
+                "target_node": env.topology.nodes[action % 10].name,
+                "target_node_id": int(action % 10),
+                "reward": round(float(reward), 2),
+                "defense_log": info.get("defense_log", ""),
+                "attacker_log": info.get("attacker_log", ""),
+                "attacker_action": info.get("attacker_action", ""),
+                "active_infections": int(info.get("active_infections", 0)),
+                "isolated_hosts": int(info.get("isolated_hosts", 0)),
+                "done": bool(done),
+                "result": info.get("result", "ONGOING"),
+            })
 
             if done:
                 break
@@ -138,8 +190,8 @@ def train_cyber_defender(
     # Save model weights and replay buffer
     agent.save_checkpoint(save_path)
     agent.replay_buffer.save_to_disk(replay_path)
-    print(f"[✓] Model checkpoint saved to: {save_path}")
-    print(f"[✓] Replay memory buffer ({len(agent.replay_buffer)} transitions) saved to: {replay_path}")
+    print("[+] Model checkpoint saved to: " + save_path)
+    print("[+] Replay memory buffer (" + str(len(agent.replay_buffer)) + " transitions) saved to: " + replay_path)
 
     # Prepare summary metrics dictionary (merge if resuming)
     metrics = {
@@ -182,7 +234,35 @@ def train_cyber_defender(
     os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
-    print(f"[✓] Cumulative training metrics saved to: {metrics_path} (Total: {metrics['num_episodes']} episodes)")
+    print(f"[+] Cumulative training metrics saved to: {metrics_path} (Total: {metrics['num_episodes']} episodes)")
+
+    # --- SAVE NEW TRANSITIONS TO JSONL ---
+    # Append a training summary entry to the JSONL fine-tuning dataset
+    jsonl_path = os.path.join(os.path.dirname(__file__), "..", "data", "fine_tuning_experience.jsonl")
+    try:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        training_entry = {
+            "timestamp": timestamp,
+            "fine_tune_episode": -1,  # Special value indicating training session
+            "step": 0,
+            "action_id": 0,
+            "action_name": "Training Session Complete",
+            "target_node": "Summary",
+            "reward": 0.0,
+            "defense_log": f"Training completed: {num_episodes} episodes fine-tuned",
+            "attacker_log": "",
+            "attacker_action": "",
+            "active_infections": 0,
+            "isolated_hosts": 0,
+            "done": True,
+            "result": "TRAINING_COMPLETE"
+        }
+        with open(jsonl_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(training_entry) + "\n")
+        print(f"[+] Training summary appended to JSONL: {jsonl_path}")
+    except Exception as e:
+        print(f"[!] Warning: Could not save to JSONL: {e}")
+    # ----------------------------------------
 
     return metrics
 
